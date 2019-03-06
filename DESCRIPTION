@@ -1,6 +1,6 @@
 Package: neonUtilities
-Version: 1.2.0
-Date: 2019-01-24
+Version: 1.2.1
+Date: 2019-03-04
 Title: Utilities for Working with NEON Data
 Author: Christine Laney <claney@battelleecology.org>, Claire Lunch <clunch@battelleecology.org>
 Maintainer: Claire Lunch <clunch@battelleecology.org>
@@ -21,6 +21,6 @@ LazyData: true
 RoxygenNote: 6.1.1
 Suggests: testthat
 NeedsCompilation: no
-Packaged: 2019-01-25 16:09:52 UTC; clunch
+Packaged: 2019-03-05 01:04:11 UTC; clunch
 Repository: CRAN
-Date/Publication: 2019-01-25 22:00:03 UTC
+Date/Publication: 2019-03-06 11:30:02 UTC
