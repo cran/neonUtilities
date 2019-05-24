@@ -63,6 +63,12 @@ bird <- loadByProduct(dpID="DP1.10003.001", site="all", package="expanded")
 names(bird)
 ```
 
+Both `zipsByProduct()` and `loadByProduct()` can also subset by sites and date range:
+
+```
+wq <- loadByProduct(dpID="DP1.20288.001", site=c("ARIK","POSE"), startdate="2018-04", enddate="2018-08")
+```
+
 `byFileAOP()` pulls data from the NEON API, specifically for remote sensing (AOP) data. This function preserves the file directory hierarchy that AOP files are typically stored in, making it easier to navigate a large number of downloaded files.
 
 ```
@@ -108,6 +114,15 @@ Disclaimer
 <!-- ****** Change Log ****** -->
 Change Log
 ----------
+
+#### 2019-03-04 v1.2.2
+-----------
+Bug fixes:
+* working progress bar in `byFileAOP()` and `byTileAOP()`
+
+Enhancements:
+* initial version of `zipsByURI()` to download via URLs within data
+
 
 #### 2019-03-04 v1.2.1
 -----------
