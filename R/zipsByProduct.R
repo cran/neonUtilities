@@ -13,7 +13,7 @@
 #' @param enddate Either NA, meaning all available dates, or a character vector in the form YYYY-MM, e.g. 2017-01. Defaults to NA.
 #' @param package Either 'basic' or 'expanded', indicating which data package to download. Defaults to basic.
 #' @param avg Either the string 'all', or the averaging interval to download, in minutes. Only applicable to sensor (IS) data. Defaults to 'all'.
-#' @param check.size T or F, should the user be told the total file size before downloading? Defaults to T. When working in batch mode, or other non-interactive workflow, use check.size=F.
+#' @param check.size T or F, should the user approve the total file size before downloading? Defaults to T. When working in batch mode, or other non-interactive workflow, use check.size=F.
 #' @param savepath The location to save the output files to
 #' @param load T or F, are files saved locally or loaded directly? Used silently with loadByProduct(), do not set manually.
 
@@ -77,20 +77,22 @@ zipsByProduct <- function(dpID, site="all", startdate=NA, enddate=NA, package="b
     # if product is OS, proceed with normal download
     if(avail$data$productScienceTeamAbbr %in% c("TOS","AOS","AOP") | 
        dpID %in% c("DP1.20267.001","DP1.00101.001","DP1.00013.001","DP1.00038.001")) {
-      stop(paste(dpID, "is not a streaming sensor (IS) data product; cannot subset by averaging interval.", sep=" "))
+      cat(paste(dpID, " is not a streaming sensor (IS) data product; cannot subset by averaging interval. Proceeding to download all available data.\n", 
+                sep=""))
   } else {
-    # check and make sure the averaging interval is valid for the product
-    if(!avg %in% table_types$tableTMI[which(table_types$productID==dpID)]) {
-      stop(paste(avg, " is not a valid averaging interval for ", dpID, 
-                 ". Use function getAvg() to find valid averaging intervals.", sep=""))
+    # exceptions for water quality, SAE, summary weather statistics
+    if(dpID %in% c("DP1.20288.001","DP4.00001.001","DP4.00200.001")) {
+      cat(paste("Subsetting by averaging interval is not available for ", dpID, 
+                ". Proceeding to download all available data.\n", sep=""))
     } else {
-      if(dpID %in% c("DP1.20288.001","DP4.00001.001")) {
-        stop(paste("Subsetting by averaging interval is not available for ", dpID, sep=""))
+      # check and make sure the averaging interval is valid for the product
+      if(!avg %in% table_types$tableTMI[which(table_types$productID==dpID)]) {
+        stop(paste(avg, " is not a valid averaging interval for ", dpID, 
+                   ". Use function getAvg() to find valid averaging intervals.", sep=""))
+        }
       }
     }
   }
-    }
-  
   
   # get the urls for months with data available
   month.urls <- unlist(avail$data$siteCodes$availableDataUrls)
@@ -257,7 +259,7 @@ zipsByProduct <- function(dpID, site="all", startdate=NA, enddate=NA, package="b
   # check for no files
   if(is.null(nrow(zip.urls))) {
     writeLines(paste0(messages[-1], collapse = "\n"))
-    stop(paste("No files found. This indicates either the API is temporarily unavailable, or the data available for ", 
+    stop(paste("No files found. This indicates either your internet connection failed, or the API is temporarily unavailable, or the data available for ", 
                dpID, 
                " are all hosted elsewhere. Check the data portal data.neonscience.org for outage alerts, and check the ", 
                dpID, " data download page for external links.", sep=""))
@@ -278,6 +280,8 @@ zipsByProduct <- function(dpID, site="all", startdate=NA, enddate=NA, package="b
     if(!(resp %in% c("y","Y"))) {
       stop("Download halted.")
     }
+  } else {
+    cat(paste("Downloading files totaling approximately", downld.size, "MB\n", sep=" "))
   }
 
   # create folder in working directory or savepath to put files in
@@ -293,9 +297,12 @@ zipsByProduct <- function(dpID, site="all", startdate=NA, enddate=NA, package="b
   utils::setTxtProgressBar(pb, 1/(nrow(zip.urls)-1))
   # copy zip files into folder
   for(i in 2:nrow(zip.urls)) {
-    downloader::download(zip.urls$URL[i], paste(filepath, zip.urls$name[i], sep="/"), 
-                         mode="wb", quiet=T)
-    utils::setTxtProgressBar(pb, i/(nrow(zip.urls)-1))
+    zip_out <- paste(filepath, zip.urls$name[i], sep="/")
+    if(!file.exists(substr(zip_out, 1, nchar(zip_out)-4)) || !file.exists(zip_out)) {
+      downloader::download(zip.urls$URL[i], zip_out, 
+                           mode="wb", quiet=T)
+      utils::setTxtProgressBar(pb, i/(nrow(zip.urls)-1))
+    }
   }
   utils::setTxtProgressBar(pb, 1)
   close(pb)
