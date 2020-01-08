@@ -10,6 +10,7 @@
 
 #' @param savepath The root folder directory where the ReadMe files are located.
 #' @param out_filepath The output directory and filename.
+#' @param dpID The data product identifier
 
 #' @references
 #' License: GNU AFFERO GENERAL PUBLIC LICENSE Version 3, 19 November 2007
@@ -19,13 +20,14 @@
 
 ##############################################################################################
 
-getReadmePublicationDate <- function(savepath, out_filepath) {
+getReadmePublicationDate <- function(savepath, out_filepath, dpID) {
   requireNamespace('stringr', quietly = TRUE)
   requireNamespace('dplyr', quiet=TRUE)
   requireNamespace('magrittr', quiet=TRUE)
   requireNamespace('stringr', quiet=TRUE)
 
-  out_filepath_name <- paste0(out_filepath, '/readme.txt')
+  dpnum <- substring(dpID, 5, 9)
+  out_filepath_name <- paste0(out_filepath, '/readme_', dpnum, '.txt')
 
   if(file.exists(out_filepath_name)) {
     unlink(out_filepath_name)
@@ -33,6 +35,9 @@ getReadmePublicationDate <- function(savepath, out_filepath) {
   #writeLines("Stacking ReadMe documentation")
   readme_list <- list.files(savepath, pattern = '.readme.',
                             recursive = TRUE, full.names = TRUE)
+  if(length(readme_list)==0) {
+    writeLines("No readme file found.\n")
+  } else {
 
   op <- pbapply::pboptions()
   pbapply::pboptions(type='none')
@@ -80,4 +85,5 @@ getReadmePublicationDate <- function(savepath, out_filepath) {
   cat("Each row contains the readme filename used during stackByTable\n", file = out_filepath_name, append=TRUE)
   cat("\n", file = out_filepath_name, append=TRUE)
   utils::write.table(pub_date_df, file=out_filepath_name, sep=",", append=TRUE, row.names=FALSE, col.names=FALSE, quote = FALSE)
+  }
 }
