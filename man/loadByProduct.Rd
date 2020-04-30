@@ -4,9 +4,18 @@
 \alias{loadByProduct}
 \title{Get files from NEON API, stack tables, and load into the current environment}
 \usage{
-loadByProduct(dpID, site = "all", startdate = NA, enddate = NA,
-  package = "basic", avg = "all", check.size = TRUE, nCores = 1,
-  forceParallel = FALSE)
+loadByProduct(
+  dpID,
+  site = "all",
+  startdate = NA,
+  enddate = NA,
+  package = "basic",
+  avg = "all",
+  check.size = TRUE,
+  nCores = 1,
+  forceParallel = FALSE,
+  token = NA
+)
 }
 \arguments{
 \item{dpID}{The identifier of the NEON data product to pull, in the form DPL.PRNUM.REV, e.g. DP1.10023.001}
@@ -26,6 +35,8 @@ loadByProduct(dpID, site = "all", startdate = NA, enddate = NA,
 \item{nCores}{The number of cores to parallelize the stacking procedure. By default it is set to a single core.}
 
 \item{forceParallel}{If the data volume to be processed does not meet minimum requirements to run in parallel, this overrides. Set to FALSE as default.}
+
+\item{token}{User specific API token (generated within neon.datascience user accounts)}
 }
 \value{
 A named list of all the data tables in the data product downloaded, plus a validation file and a variables file, as available.

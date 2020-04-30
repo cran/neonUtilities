@@ -77,7 +77,8 @@ stackDataFilesParallel <- function(folder, nCores=1, dpID){
     # find external lab tables (lab-current, lab-all) and copy the most recently published file from each lab into stackedFiles
     labTables <- tables[which(tables %in% table_types$tableName[which(table_types$tableType %in% c("lab-current","lab-all"))])]
     if(length(labTables)>0){
-      externalLabs <- unique(names(datafls)[grep(paste(labTables, collapse='|'), names(datafls))])
+      externalLabs <- unique(names(datafls)[grep(paste(paste('.', labTables, '.', sep=''), 
+                                                       collapse='|'), names(datafls))])
       
       pbapply::pblapply(as.list(externalLabs), function(x) {
         labpath <- getRecentPublication(filepaths[grep(x, filepaths)])
@@ -88,7 +89,7 @@ stackDataFilesParallel <- function(folder, nCores=1, dpID){
       n <- n + length(externalLabs)
     }
 
-    # copy variables and validation files to /stackedFiles using the most recent publication date 
+    # copy variables and validation files to /stackedFiles using the most recent publication date
     if(TRUE %in% stringr::str_detect(filepaths,'variables.20')) {
       varpath <- getRecentPublication(filepaths[grep("variables.20", filepaths)])
       variables <- getVariables(varpath)   # get the variables from the chosen variables file
@@ -102,7 +103,16 @@ stackDataFilesParallel <- function(folder, nCores=1, dpID){
       messages <- c(messages, "Copied the most recent publication of validation file to /stackedFiles")
       m <- m + 1
     }
+
+    # copy categoricalCodes file to /stackedFiles using the most recent publication date
+    if(TRUE %in% stringr::str_detect(filepaths,'categoricalCodes')) {
+      lovpath <- getRecentPublication(filepaths[grep("categoricalCodes", filepaths)])
+      file.copy(from = lovpath, to = paste0(folder, "/stackedFiles/categoricalCodes_", dpnum, ".csv"))
+      messages <- c(messages, "Copied the most recent publication of categoricalCodes file to /stackedFiles")
+      m <- m + 1
+    }
     
+    # get most recent sensor_positions file for each site and stack
     if(TRUE %in% stringr::str_detect(filepaths,'sensor_position')) {
       sensorPositionList <- unique(filepaths[grep("sensor_position", filepaths)])
       uniqueSites <- unique(basename(sensorPositionList)) %>%
@@ -139,7 +149,8 @@ stackDataFilesParallel <- function(folder, nCores=1, dpID){
         writeLines(paste0("File requirements do not meet the threshold for automatic parallelization. Running on single core."))
       }
     } else {
-      cl <- parallel::makeCluster(getOption("cl.cores", nCores))
+      cl <- parallel::makeCluster(getOption("cl.cores", nCores),
+                                  setup_strategy='sequential')
       parallel::clusterEvalQ(cl, c(library(dplyr), library(magrittr), library(data.table))) 
       writeLines(paste0("Parallelizing stacking operation across ", nCores, " cores."))
       # If error, crash, or completion , closes all clusters
@@ -151,7 +162,8 @@ stackDataFilesParallel <- function(folder, nCores=1, dpID){
       variables <- getVariables(varpath)  # get the variables from the chosen variables file
 
       writeLines(paste0("Stacking table ", tables[i]))
-      file_list <- filepaths[grep(paste(".", tables[i], ".", sep=""), filepaths, fixed=T)]
+      file_list <- sort(union(filepaths[grep(paste(".", tables[i], "_pub.", sep=""), filepaths, fixed=T)],
+                         filepaths[grep(paste(".", tables[i], ".", sep=""), filepaths, fixed=T)]))
 
       if(tbltype == "site-all") {
         sites <- as.list(unique(substr(basename(file_list), 10, 13)))
@@ -188,12 +200,13 @@ stackDataFilesParallel <- function(folder, nCores=1, dpID){
         vtable <- which(names(vlist)==tables[i])
         if(length(vtable==1)) {
           if("horizontalPosition" %in% names(stackedDf)) {
-            vlist[[vtable]] <- base::rbind(base::cbind(table=rep(tables[i],4), added_fields[1:4,]), 
-                                           vlist[[vtable]], fill=T)
+            vlist[[vtable]] <- data.table::rbindlist(list(data.frame(base::cbind(table=rep(tables[i],4), 
+                                                                                 added_fields[1:4,])), 
+                                           vlist[[vtable]]), fill=TRUE)
           }
           if("publicationDate" %in% names(stackedDf)) {
-            vlist[[vtable]] <- base::rbind(vlist[[vtable]], 
-                                           c(table=tables[i], added_fields[5,]), fill=T)
+            vlist[[vtable]] <- data.table::rbindlist(list(vlist[[vtable]], 
+                                           c(table=tables[i], added_fields[5,])), fill=TRUE)
           }
         }
       }

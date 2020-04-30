@@ -4,9 +4,18 @@
 \alias{zipsByProduct}
 \title{Get files from NEON API to feed the stackByTable() function}
 \usage{
-zipsByProduct(dpID, site = "all", startdate = NA, enddate = NA,
-  package = "basic", avg = "all", check.size = TRUE, savepath = NA,
-  load = F)
+zipsByProduct(
+  dpID,
+  site = "all",
+  startdate = NA,
+  enddate = NA,
+  package = "basic",
+  avg = "all",
+  check.size = TRUE,
+  savepath = NA,
+  load = F,
+  token = NA
+)
 }
 \arguments{
 \item{dpID}{The identifier of the NEON data product to pull, in the form DPL.PRNUM.REV, e.g. DP1.10023.001}
@@ -26,6 +35,8 @@ zipsByProduct(dpID, site = "all", startdate = NA, enddate = NA,
 \item{savepath}{The location to save the output files to}
 
 \item{load}{T or F, are files saved locally or loaded directly? Used silently with loadByProduct(), do not set manually.}
+
+\item{token}{User specific API token (generated within neon.datascience user accounts)}
 }
 \value{
 A folder in the working directory (or in savepath, if specified), containing all zip files meeting query criteria.
