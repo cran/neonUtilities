@@ -52,8 +52,8 @@ zipsByProduct <- function(dpID, site="all", startdate=NA, enddate=NA, package="b
   }
 
   # error message if dpID isn't formatted as expected
-  if(regexpr("DP[1-4]{1}.[0-9]{5}.001",dpID)!=1) {
-    stop(paste(dpID, "is not a properly formatted data product ID. The correct format is DP#.#####.001", sep=" "))
+  if(regexpr("DP[1-4]{1}.[0-9]{5}.00[0-9]{1}",dpID)!=1) {
+    stop(paste(dpID, "is not a properly formatted data product ID. The correct format is DP#.#####.00#", sep=" "))
   }
 
   # error message if dpID can't be downloaded by zipsByProduct()
@@ -94,6 +94,42 @@ zipsByProduct <- function(dpID, site="all", startdate=NA, enddate=NA, package="b
                  'DP3.00009.001','DP3.00010.001','DP4.00002.001','DP4.00007.001',
                  'DP4.00067.001','DP4.00137.001','DP4.00201.001')) {
     stop(paste(dpID, 'is only available in the bundled eddy covariance data product. Download DP4.00200.001 to access these data.', sep=' '))
+  }
+  
+  # redirect for met/precip data shared between terrestrial & aquatic sites
+  # site=='all' not addressed, because in that case all available sites for the product are returned
+  if(dpID %in% shared_aquatic$product & any(site %in% shared_aquatic$site)) {
+    cat(paste("Some sites in your download request are aquatic sites where ", 
+              dpID, " is collected at a nearby terrestrial site. The sites you requested, and the sites that will be accessed instead, are listed below:\n", 
+              sep=""))
+    site <- unlist(lapply(site, function(x) {
+      if(x %in% shared_aquatic$site) {
+        if(dpID %in% shared_aquatic$product[which(shared_aquatic$site==x)]) {
+          terrSite <- unique(shared_aquatic$towerSite[which(shared_aquatic$site==x)])
+          cat(paste(x, " -> ", terrSite, "\n", sep=""))
+          return(terrSite)
+        }
+        else {
+          return(x)
+        }
+      }
+      else {
+        return(x)
+      }
+    }))
+  }
+  
+  # redirect for chemistry data product bundles
+  if(dpID %in% chem_bundles$product) {
+    if(chem_bundles$homeProduct[which(chem_bundles$product==dpID)]==
+       "depends") {
+      stop("Root chemistry and isotopes have been bundled with the root biomass data. For root chemistry from Megapits, download DP1.10066.001. For root chemistry from periodic sampling, download DP1.10067.001.")
+    } else {
+      newDPID <- chem_bundles$homeProduct[which(chem_bundles$product==dpID)]
+      stop(paste(dpID, " has been bundled with ", newDPID, 
+                " and is not available independently. Please download ", 
+                newDPID, sep=""))
+    }
   }
 
   # query the products endpoint for the product requested
