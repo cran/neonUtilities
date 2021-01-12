@@ -40,7 +40,7 @@ library(neonUtilities)
 
 #### Short examples
 
-See [NEON Data Tutorials](https://www.neonscience.org/resources/data-tutorials) for more information, particularly the [Download and Explore](https://www.neonscience.org/download-explore-neon-data) and [neonUtilities](https://www.neonscience.org/neonDataStackR) tutorials.
+See [NEON Data Tutorials](https://www.neonscience.org/resources/learning-hub/tutorials) for more information, particularly the [Download and Explore](https://www.neonscience.org/resources/learning-hub/tutorials/download-explore-neon-data) and [neonUtilities](https://www.neonscience.org/resources/learning-hub/tutorials/neondatastackr) tutorials.
 
 `stackByTable()` unzips monthly packages, finds the CSV data files, and joins them by table (e.g., 2DWSD_2min, 2DWSD_30min for 2D Wind Speed and Direction). For data products from instrumented systems that have multiple sensors placed at various heights (or depths) and/or horizontal positions away from the supporting tower, this function will create 2 columns in addition to the existing columns, one for horizontalPosition and the other for verticalPosition. This function will only work for data products that organize data in CSV files. Other data file types, such as HDF5 files from the eddy covariance system and remote sensing airborne observing platform (AOP) are not supported.
 
@@ -107,7 +107,7 @@ byTileAOP(dpID="DP3.30026.001", site="SJER", year="2017", easting=easting, north
 
 ### Getting help with this package
 
-For a tutorial explaining how to use the `neonUtilities` package in more detail, including additional input options, view the [*Use the neonUtilities Package to Access NEON Data* tutorial](https://www.neonscience.org/neonDataStackR).
+For a tutorial explaining how to use the `neonUtilities` package in more detail, including additional input options, view the [*Use the neonUtilities Package to Access NEON Data* tutorial](https://www.neonscience.org/resources/learning-hub/tutorials/neondatastackr).
 
 ### Known issues
 * `zipsByProduct()` and `byFileAOP()` use the `download.file()` function, wrapped by the `downloader` package, and we've found in testing that `download.file()` can be finicky. Using R version > 3.4 seems to help, and if you're on Windows, using Windows 10. Feel free to contact us if you run into problems!
@@ -132,6 +132,13 @@ Disclaimer
 <!-- ****** Change Log ****** -->
 Change Log
 ----------
+
+#### 2021-01-06 v1.3.9
+Bug fixes:
+* fix bug in handling of .gz files in `stackEddy()`
+* fix pubdate filtering in `stackFromStore()`
+* regularize fail behavior when API is unavailable
+
 
 #### 2020-11-09 v1.3.8
 Bug fixes:
