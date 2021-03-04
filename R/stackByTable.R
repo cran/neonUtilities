@@ -95,9 +95,22 @@ stackByTable <- function(filepath, savepath=NA, folder=FALSE, saveUnzippedFiles=
       stop("Files not found in specified filepaths. Check that the input list contains the full filepaths.")
     }
   } else {
-    dpID <- substr(basename(files[1]), 15, 27)
-    package <- substr(files[1], nchar(files[1])-25, nchar(files[1])-21)
-    if(package == "anded"){package <- "expanded"}
+    # this regexpr allows for REV = .001 or .002
+    dpID <- unique(regmatches(basename(files), 
+                       regexpr("DP[1-4][.][0-9]{5}[.]00[1-2]", 
+                               basename(files))))
+    if(!identical(length(dpID), as.integer(1))) {
+      stop("Data product ID could not be determined. Check that filepath contains data files, from a single NEON data product.")
+    }
+    pack.files <- unique(regmatches(basename(files), 
+                                 regexpr("basic|expanded",
+                                         basename(files))))
+    # expanded package can contain basic files
+    if(any(pack.files=="expanded")) { 
+      package <- "expanded"
+    } else {
+      package <- "basic"
+    }
   }
   
   # error message if dpID isn't formatted as expected
@@ -125,11 +138,6 @@ stackByTable <- function(filepath, savepath=NA, folder=FALSE, saveUnzippedFiles=
     message("Attempting to stack soil sensor data. Note that due to the number of soil sensors at each site, data volume is very high for these data. Consider dividing data processing into chunks, using the nCores= parameter to parallelize stacking, and/or using a high-performance system.")
   }
   
-  # warning about saveUnzippedFiles loss of file structure in 2.0
-  if(saveUnzippedFiles==TRUE & !folder) {
-    message("saveUnzippedFiles behavior has changed in v2.0; site-month folder structure is not retained in all cases. If an organized local record of NEON files is desired, the neonstore package is recommended, and can be used with stackFromStore() in the neonUtilities package.")
-  }
-  
   #### If all checks pass, unzip and stack files ####
   envt <- 0
   if(folder==FALSE) {
@@ -142,9 +150,14 @@ stackByTable <- function(filepath, savepath=NA, folder=FALSE, saveUnzippedFiles=
       zipList <- unzipZipfileParallel(zippath = filepath, outpath = savepath, level = "all", nCores)
     } else {
       if(!dir.exists(savepath)){dir.create(savepath)}
-      utils::unzip(zipfile=filepath, exdir=savepath, junkpaths=T)
+      if(envt==0) {
+        utils::unzip(zipfile=filepath, exdir=dirname(savepath))
+      } else {
+        utils::unzip(zipfile=filepath, exdir=savepath)
+      }
       zipList <- list.files(savepath)
-      zipList <- zipList[grep("NEON.", zipList, fixed=T)]
+      zipList <- zipList[grep("NEON[.]D[0-9]{2}[.][A-Z]{4}[.]DP[0-4]{1}[.]", 
+                              zipList)]
     }
   }
 

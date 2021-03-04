@@ -264,8 +264,15 @@ zipsByProduct <- function(dpID, site="all", startdate=NA, enddate=NA, package="b
   } else {
     filepath <- paste(savepath, "/filesToStack", substr(dpID, 5, 9), sep="")
   }
-  dir.create(filepath)
-
+  if(!dir.exists(filepath)) {
+    dirc <- dir.create(filepath)
+    if(!dirc) {
+      stop("filesToStack directory could not be created. Check that savepath is a valid directory.")
+    }
+  } else {
+    message(paste(filepath, " already exists. Download will proceed, but check for duplicate files.", sep=""))
+  }
+  
   writeLines(paste("Downloading ", nrow(zip.urls), " files", sep=""))
   pb <- utils::txtProgressBar(style=3)
   utils::setTxtProgressBar(pb, 1/(nrow(zip.urls)-1))
@@ -275,9 +282,9 @@ zipsByProduct <- function(dpID, site="all", startdate=NA, enddate=NA, package="b
 
   while(j <= nrow(zip.urls)) {
 
-    if (counter > 3) {
-      cat(paste0("\nURL query ", zip.urls$name[j],
-                 " failed. The API or data product requested may be unavailable at this time; check data portal (data.neonscience.org/news) for possible outage alert."))
+    if (counter > 2) {
+      cat(paste0("\nRefresh did not solve the isse. URL query for file ", zip.urls$name[j],
+                 " failed. If all files fail, check data portal (data.neonscience.org/news) for possible outage alert.\n"))
       j <- j + 1
       counter <- 1
     } else {
@@ -285,25 +292,41 @@ zipsByProduct <- function(dpID, site="all", startdate=NA, enddate=NA, package="b
       if(!file.exists(substr(zip_out, 1, nchar(zip_out)-4)) || !file.exists(zip_out)) {
         t <- tryCatch(
           {
-            suppressWarnings(downloader::download(zip.urls$URL[j], zip_out,
+            suppressWarnings(downloader::download(zip.urls$URL[j], destfile=zip_out,
                                                   mode="wb", quiet=T))
           }, error = function(e) { e } )
 
         if(inherits(t, "error")) {
-          writeLines(paste0(zip.urls$name[j], " could not be downloaded. URLs may have expired. Trying new URLs."))
-
-          zip.urls <- quietMessages(getZipUrls(month.urls, avg=avg, package=package, tabl=tabl, dpID=dpID, messages=messages, token = token))
-          zip.urls <- tidyr::drop_na(zip.urls)
-
-          counter <- counter + 1
-
+          
+          # re-attempt download once with no changes
+          if(counter < 2) {
+            writeLines(paste0("\n", zip.urls$name[j], " could not be downloaded. Re-attempting."))
+            t <- tryCatch(
+              {
+                suppressWarnings(downloader::download(zip.urls$URL[j], destfile=zip_out,
+                                                      mode="wb", quiet=T))
+              }, error = function(e) { e } )
+            if(inherits(t, "error")) {
+              counter <- counter + 1
+            } else {
+              j <- j + 1
+              counter <- 1
+            }
+          } else {
+            writeLines(paste0("\n", zip.urls$name[j], " could not be downloaded. URLs may have expired. Refreshing URL list."))
+            
+            zip.urls <- quietMessages(getZipUrls(month.urls, avg=avg, package=package, tabl=tabl, dpID=dpID, messages=messages, token = token))
+            zip.urls <- tidyr::drop_na(zip.urls)
+            
+            counter <- counter + 1
+          }
         } else {
           j <- j + 1
           counter <- 1
+          utils::setTxtProgressBar(pb, j/(nrow(zip.urls)-1))
         }
       }
 
-      utils::setTxtProgressBar(pb, j/(nrow(zip.urls)-1))
     }
   }
 
