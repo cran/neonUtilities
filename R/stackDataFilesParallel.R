@@ -46,8 +46,7 @@ stackDataFilesParallel <- function(folder, nCores=1, dpID){
   filepaths <- findDatatables(folder = folder, fnames = T)
   
   # handle per-sample tables separately
-  if(dpID %in% c("DP1.30012.001", "DP1.10081.001", "DP1.20086.001", "DP1.20141.001",
-                 "DP1.20126.001", "DP1.20221.001") & 
+  if(dpID %in% c("DP1.30012.001", "DP1.10081.001", "DP1.20086.001", "DP1.20141.001") & 
      length(grep("^NEON.", basename(filenames), invert=TRUE))>0) {
     framefiles <- filepaths[grep("^NEON.", basename(filenames), invert=TRUE)]
     filepaths <- filepaths[grep("^NEON.", basename(filenames))]
@@ -328,6 +327,19 @@ stackDataFilesParallel <- function(folder, nCores=1, dpID){
     messages <- c(messages, "Copied the most recent publication of variable definition file to /stackedFiles")
     m <- m + 1
     
+  }
+  
+  # get issue log
+  if(!curl::has_internet()) {
+    messages <- c(messages, "No internet connection, issue log file not accessed. Issue log can be found in the readme file.")
+  } else {
+    # token not used here, since token is not otherwise used/accessible in this function
+    issues <- getIssueLog(dpID=dpID)
+    if(!is.null(issues)) {
+      utils::write.csv(issues, paste0(folder, "/stackedFiles/issueLog_", dpnum, ".csv"),
+                       row.names=FALSE)
+      m <- m + 1
+    }
   }
   
   writeLines(paste0(messages, collapse = "\n"))

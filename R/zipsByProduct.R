@@ -127,7 +127,7 @@ zipsByProduct <- function(dpID, site="all", startdate=NA, enddate=NA, package="b
                  'DP1.00036.001','DP1.00037.001','DP1.00099.001','DP1.00100.001',
                  'DP2.00008.001','DP2.00009.001','DP2.00024.001','DP3.00008.001',
                  'DP3.00009.001','DP3.00010.001','DP4.00002.001','DP4.00007.001',
-                 'DP4.00067.001','DP4.00137.001','DP4.00201.001')) {
+                 'DP4.00067.001','DP4.00137.001','DP4.00201.001','DP1.00030.001')) {
     stop(paste(dpID, 'is only available in the bundled eddy covariance data product. Download DP4.00200.001 to access these data.', sep=' '))
   }
   
@@ -167,9 +167,22 @@ zipsByProduct <- function(dpID, site="all", startdate=NA, enddate=NA, package="b
     }
   }
 
+  # redirect for veg structure and sediment data product bundles
+  if(dpID %in% other_bundles$product & release!="RELEASE-2021") {
+    newDPID <- other_bundles$homeProduct[which(other_bundles$product==dpID)]
+    stop(paste("Except in RELEASE-2021, ", dpID, " has been bundled with ", newDPID, 
+               " and is not available independently. Please download ", 
+               newDPID, sep=""))
+  }
+  
   # query the products endpoint for the product requested
-  prod.req <- getAPI(apiURL = paste("http://data.neonscience.org/api/v0/products/", 
-                                    dpID, sep=""), token = token)
+  if(release=="current") {
+    prod.req <- getAPI(apiURL = paste("http://data.neonscience.org/api/v0/products/", 
+                                      dpID, sep=""), token = token)
+  } else {
+    prod.req <- getAPI(apiURL = paste("http://data.neonscience.org/api/v0/products/", 
+                                      dpID, "?release=", release, sep=""), token = token)
+  }
 
   avail <- jsonlite::fromJSON(httr::content(prod.req, as='text', encoding='UTF-8'), 
                               simplifyDataFrame=TRUE, flatten=TRUE)
@@ -212,6 +225,11 @@ zipsByProduct <- function(dpID, site="all", startdate=NA, enddate=NA, package="b
 
   # get the urls for months with data available
   month.urls <- unlist(avail$data$siteCodes$availableDataUrls)
+  
+  # error message if nothing is available
+  if(length(month.urls)==0) {
+    stop("There are no data matching the search criteria.")
+  }
 
   # subset by sites if requested
   if(!"all" %in% site) {
@@ -227,7 +245,7 @@ zipsByProduct <- function(dpID, site="all", startdate=NA, enddate=NA, package="b
 
   # subset by dates if requested
   if(!is.na(startdate)) {
-    datelist <- substring(month.urls, nchar(month.urls[1])-6, nchar(month.urls[1]))
+    datelist <- regmatches(month.urls, regexpr("20[0-9]{2}-[0-9]{2}", month.urls))
     month.urls <- month.urls[which(datelist >= startdate)]
   }
 
@@ -237,7 +255,7 @@ zipsByProduct <- function(dpID, site="all", startdate=NA, enddate=NA, package="b
   }
 
   if(!is.na(enddate)) {
-    datelist <- substring(month.urls, nchar(month.urls[1])-6, nchar(month.urls[1]))
+    datelist <- regmatches(month.urls, regexpr("20[0-9]{2}-[0-9]{2}", month.urls))
     month.urls <- month.urls[which(datelist <= enddate)]
   }
 
@@ -298,22 +316,42 @@ zipsByProduct <- function(dpID, site="all", startdate=NA, enddate=NA, package="b
     } else {
       zip_out <- paste(filepath, zip.urls$name[j], sep="/")
       if(!file.exists(substr(zip_out, 1, nchar(zip_out)-4)) || !file.exists(zip_out)) {
-        t <- tryCatch(
-          {
-            suppressWarnings(downloader::download(zip.urls$URL[j], destfile=zip_out,
-                                                  mode="wb", quiet=T))
-          }, error = function(e) { e } )
+        if(is.na(token)) {
+          t <- tryCatch(
+            {
+              suppressWarnings(downloader::download(zip.urls$URL[j], destfile=zip_out,
+                                                    mode="wb", quiet=T))
+            }, error = function(e) { e } )
+        } else {
+          t <- tryCatch(
+            {
+              suppressWarnings(downloader::download(zip.urls$URL[j], destfile=zip_out,
+                                                    mode="wb", quiet=T,
+                                                    headers=c("X-API-Token"=token)))
+            }, error = function(e) { e } )
+        }
 
         if(inherits(t, "error")) {
           
           # re-attempt download once with no changes
           if(counter < 2) {
             writeLines(paste0("\n", zip.urls$name[j], " could not be downloaded. Re-attempting."))
-            t <- tryCatch(
-              {
-                suppressWarnings(downloader::download(zip.urls$URL[j], destfile=zip_out,
-                                                      mode="wb", quiet=T))
-              }, error = function(e) { e } )
+            
+            if(is.na(token)) {
+              t <- tryCatch(
+                {
+                  suppressWarnings(downloader::download(zip.urls$URL[j], destfile=zip_out,
+                                                        mode="wb", quiet=T))
+                }, error = function(e) { e } )
+            } else {
+              t <- tryCatch(
+                {
+                  suppressWarnings(downloader::download(zip.urls$URL[j], destfile=zip_out,
+                                                        mode="wb", quiet=T,
+                                                        headers=c("X-API-Token"=token)))
+                }, error = function(e) { e } )
+            }
+            
             if(inherits(t, "error")) {
               counter <- counter + 1
             } else {
