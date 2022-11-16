@@ -101,7 +101,7 @@ byTileAOP <- function(dpID, site, year, easting, northing, buffer=0,
   # check for sites that are flown under the flight box of a different site
   if(site %in% shared_flights$site) {
     flightSite <- shared_flights$flightSite[which(shared_flights$site==site)]
-    if(site %in% c('TREE','CHEQ','KONA')) {
+    if(site %in% c('TREE','CHEQ','KONA','DCFS')) {
       cat(paste(site, ' is part of the flight box for ', flightSite,
                 '. Downloading data from ', flightSite, '.\n', sep=''))
     } else {
@@ -236,6 +236,10 @@ byTileAOP <- function(dpID, site, year, easting, northing, buffer=0,
   file.urls.current <- getTileUrls(month.urls,
                                    format(tileEasting, scientific=F, justified='none'),
                                    format(tileNorthing, scientific=F, justified='none'))
+  if(is.null(file.urls.current)) {
+    message("No data files found.")
+    return(invisible())
+  }
   downld.size <- sum(as.numeric(as.character(file.urls.current$size)), na.rm=T)
   downld.size.read <- convByteSize(downld.size)
 
@@ -335,6 +339,6 @@ byTileAOP <- function(dpID, site, year, easting, northing, buffer=0,
   utils::write.csv(issues, paste0(filepath, "/issueLog_", dpID, ".csv"),
                    row.names=FALSE)
 
-  writeLines(paste("Successfully downloaded ", length(messages), " files."))
-  writeLines(paste0(messages, collapse = "\n"))
+  writeLines(paste("Successfully downloaded ", length(messages), " files to ", filepath, sep=""))
+  #writeLines(paste0(messages, collapse = "\n")) # removed in v2.2.0, file lists were excessively long
 }

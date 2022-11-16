@@ -29,6 +29,12 @@ getFileUrls <- function(m.urls, token=NA){
 
     tmp <- getAPI(apiURL = m.urls[i], token = token)
     
+    if(tmp$status_code!=200) {
+      message(paste("Data file retrieval failed with code ", tmp$status_code, 
+                    ". Check NEON data portal for outage alerts.", sep=""))
+      return(invisible())
+    }
+    
     tmp.files <- jsonlite::fromJSON(httr::content(tmp, as='text', encoding='UTF-8'), 
                                 simplifyDataFrame=TRUE, flatten=TRUE)
 
@@ -43,14 +49,16 @@ getFileUrls <- function(m.urls, token=NA){
                                         tmp.files$data$files$url,
                                         tmp.files$data$files$size))
 
-    # get size info
-    file.urls <- data.frame(file.urls, row.names=NULL)
-    colnames(file.urls) <- c("name", "URL", "size")
-    file.urls$URL <- as.character(file.urls$URL)
-    file.urls$name <- as.character(file.urls$name)
-
-    if(length(url.messages) > 0){writeLines(url.messages)}
-    file.urls <- file.urls[-1, ]
-    return(file.urls)
   }
+  
+  # get size info
+  file.urls <- data.frame(file.urls, row.names=NULL)
+  colnames(file.urls) <- c("name", "URL", "size")
+  file.urls$URL <- as.character(file.urls$URL)
+  file.urls$name <- as.character(file.urls$name)
+  
+  if(length(url.messages) > 0){writeLines(url.messages)}
+  file.urls <- file.urls[-1,]
+  return(file.urls)
+  
 }

@@ -133,7 +133,7 @@ zipsByProduct <- function(dpID, site="all", startdate=NA, enddate=NA, package="b
   
   # redirect for met/precip data shared between terrestrial & aquatic sites
   # site=='all' not addressed, because in that case all available sites for the product are returned
-  if(dpID %in% shared_aquatic$product & any(site %in% shared_aquatic$site)) {
+  if(length(intersect(which(shared_aquatic$product==dpID), which(shared_aquatic$site %in% site)))>0) {
     cat(paste("Some sites in your download request are aquatic sites where ", 
               dpID, " is collected at a nearby terrestrial site. The sites you requested, and the sites that will be accessed instead, are listed below:\n", 
               sep=""))
@@ -141,6 +141,7 @@ zipsByProduct <- function(dpID, site="all", startdate=NA, enddate=NA, package="b
       if(x %in% shared_aquatic$site) {
         if(dpID %in% shared_aquatic$product[which(shared_aquatic$site==x)]) {
           terrSite <- unique(shared_aquatic$towerSite[which(shared_aquatic$site==x)])
+          
           cat(paste(x, " -> ", terrSite, "\n", sep=""))
           return(terrSite)
         }
@@ -189,12 +190,20 @@ zipsByProduct <- function(dpID, site="all", startdate=NA, enddate=NA, package="b
                                       dpID, "?release=", release, sep=""), token = token)
   }
 
+  if(is.null(prod.req)) {
+    return(invisible())
+  }
   avail <- jsonlite::fromJSON(httr::content(prod.req, as='text', encoding='UTF-8'), 
                               simplifyDataFrame=TRUE, flatten=TRUE)
   
   # error message if product not found
   if(!is.null(avail$error$status)) {
-    stop(paste("No data found for product", dpID, sep=" "))
+    if(release=="LATEST") {
+      stop(paste("No data found for product ", dpID, 
+                 ". LATEST data requested; check that token is valid for LATEST access.", sep=""))
+    } else {
+      stop(paste("No data found for product", dpID, sep=" "))
+    }
   }
   
   # check that token was used

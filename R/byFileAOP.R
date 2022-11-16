@@ -87,7 +87,7 @@ byFileAOP <- function(dpID, site, year, check.size=TRUE, savepath=NA, token=NA_c
   # check for sites that are flown under the flight box of a different site
   if(site %in% shared_flights$site) {
     flightSite <- shared_flights$flightSite[which(shared_flights$site==site)]
-    if(site %in% c('TREE','CHEQ','KONA')) {
+    if(site %in% c('TREE','CHEQ','KONA','DCFS')) {
       cat(paste(site, ' is part of the flight box for ', flightSite,
                 '. Downloading data from ', flightSite, '.\n', sep=''))
     } else {
@@ -108,6 +108,10 @@ byFileAOP <- function(dpID, site, year, check.size=TRUE, savepath=NA, token=NA_c
   }
 
   file.urls.current <- getFileUrls(month.urls, token = token)
+  if(is.null(file.urls.current)) {
+    message("No data files found.")
+    return(invisible())
+  }
   downld.size <- sum(as.numeric(as.character(file.urls.current$size)), na.rm=T)
   downld.size.read <- convByteSize(downld.size)
 
@@ -209,6 +213,6 @@ byFileAOP <- function(dpID, site, year, check.size=TRUE, savepath=NA, token=NA_c
   utils::write.csv(issues, paste0(filepath, "/issueLog_", dpID, ".csv"),
                    row.names=FALSE)
 
-  writeLines(paste("Successfully downloaded ", length(messages), " files."))
-  writeLines(paste0(messages, collapse = "\n"))
+  writeLines(paste("Successfully downloaded ", length(messages), " files to ", filepath, sep=""))
+  #writeLines(paste0(messages, collapse = "\n")) # removed in v2.2.0, file lists were excessively long
 }

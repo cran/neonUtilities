@@ -142,6 +142,14 @@ stackDataFilesParallel <- function(folder, nCores=1, dpID){
       varpath <- getRecentPublication(filepaths[grep("variables.20", filepaths)])[[1]]
       variables <- getVariables(varpath)   # get the variables from the chosen variables file
       v <- suppressWarnings(data.table::fread(varpath, sep=','))
+      
+      # if science review flags are present but missing from variables file, add variables
+      if(!"science_review_flags" %in% v$table) {
+        if(length(grep("science_review_flags", filepaths))>0) {
+          v <- rbind(v, science_review_variables)
+        }
+      }
+      
       vlist <- base::split(v, v$table)
     }
     
@@ -189,6 +197,21 @@ stackDataFilesParallel <- function(folder, nCores=1, dpID){
             }, filepaths=filepaths), fill=TRUE)
           
         data.table::fwrite(outputLab, paste0(folder, "/stackedFiles/", labTables[j], ".csv"))
+        
+        # add publication and release field names to variables file
+        if(!is.null(vlist)) {
+          vtable <- which(names(vlist)==labTables[j])
+          if(length(vtable==1)) {
+            if("publicationDate" %in% names(outputLab)) {
+              vlist[[vtable]] <- data.table::rbindlist(list(vlist[[vtable]], 
+                                                            c(table=labTables[j], added_fields[5,])), fill=TRUE)
+            }
+            if("release" %in% names(outputLab)) {
+              vlist[[vtable]] <- data.table::rbindlist(list(vlist[[vtable]], 
+                                                            c(table=labTables[j], added_fields[6,])), fill=TRUE)
+            }
+          }
+        }
         n <- n + 1
         }
       }
@@ -201,7 +224,8 @@ stackDataFilesParallel <- function(folder, nCores=1, dpID){
       uniqueSites <- stringr::str_split(unique(basename(sensorPositionList)), "\\.")
       uniqueSites <- unique(unlist(lapply(uniqueSites, "[", 3)))
 
-      outputSensorPositions <- data.table::rbindlist(pbapply::pblapply(as.list(uniqueSites), function(x, sensorPositionList) {
+      outputSensorPositions <- data.table::rbindlist(pbapply::pblapply(as.list(uniqueSites), 
+                                                                       function(x, sensorPositionList) {
         
         sppath <- getRecentPublication(sensorPositionList[grep(x, sensorPositionList)])[[1]]
         outTbl <- data.table::fread(sppath, header=TRUE, encoding="UTF-8", keepLeadingZeros = TRUE,
@@ -218,6 +242,54 @@ stackDataFilesParallel <- function(folder, nCores=1, dpID){
       if(!identical(nrow(outputSensorPositions), as.integer(0))) {
         data.table::fwrite(outputSensorPositions, paste0(folder, "/stackedFiles/sensor_positions_", dpnum, ".csv"))
         messages <- c(messages, "Merged the most recent publication of sensor position files for each site and saved to /stackedFiles")
+        m <- m + 1
+      }
+    }
+    
+    # aggregate the science_review_flags files
+    if(TRUE %in% stringr::str_detect(filepaths,'science_review_flags')) {
+      scienceReviewList <- unique(filepaths[grep("science_review_flags", filepaths)])
+
+      # stack all files
+      outputScienceReview <- data.table::rbindlist(pbapply::pblapply(scienceReviewList, 
+                                                                     function(x) {
+        
+        outTbl <- data.table::fread(x, header=TRUE, encoding="UTF-8", keepLeadingZeros = TRUE,
+                                    colClasses = list(character = c('startDateTime','endDateTime',
+                                                                    'createDateTime',
+                                                                    'lastUpdateDateTime')))
+        if(identical(nrow(outTbl), as.integer(0))) {
+          return()
+        }
+        return(outTbl)
+      }), fill=TRUE)
+      
+      # remove duplicates
+      outputScienceReview <- unique(outputScienceReview)
+      
+      # check for non-identical duplicates with the same ID and keep the most recent one
+      if(length(unique(outputScienceReview$srfID))!=nrow(outputScienceReview)) {
+        dupRm <- numeric()
+        rowids <- 1:nrow(outputScienceReview)
+        origNames <- colnames(outputScienceReview)
+        outputScienceReview <- cbind(rowids, outputScienceReview)
+        for(k in unique(outputScienceReview$srfID)) {
+          scirvwDup <- outputScienceReview[which(outputScienceReview$srfID==k),]
+          if(nrow(scirvwDup)>1) {
+            dupRm <- c(dupRm, 
+                       scirvwDup$rowids[which(scirvwDup$lastUpdateDateTime!=max(scirvwDup$lastUpdateDateTime))])
+          }
+        }
+        if(length(dupRm)>0) {
+          outputScienceReview <- outputScienceReview[-dupRm,origNames]
+        } else {
+          outputScienceReview <- outputScienceReview[,origNames]
+        }
+      }
+      
+      if(!identical(nrow(outputScienceReview), as.integer(0))) {
+        data.table::fwrite(outputScienceReview, paste0(folder, "/stackedFiles/science_review_flags_", dpnum, ".csv"))
+        messages <- c(messages, "Aggregated the science review flag files for each site and saved to /stackedFiles")
         m <- m + 1
       }
     }
