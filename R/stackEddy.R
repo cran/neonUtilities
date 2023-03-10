@@ -51,7 +51,7 @@ stackEddy <- function(filepath, level="dp04", var=NA, avg=NA) {
       stop("Input list of files must be .h5 files.")
     }
     if(any(!file.exists(files))) {
-      stop("Files not found in specified filepaths. Check that the input list contains the full filepaths.")
+      stop("Files not found in specified filepaths. Check that the input list contains the correct filepaths.")
     }
   }
   
@@ -94,7 +94,8 @@ stackEddy <- function(filepath, level="dp04", var=NA, avg=NA) {
     files <- list.files(filepath, recursive=F, full.names=T)
   }
   
-  # only need the H5 files for data extraction
+  # need the H5 files for data extraction and the SRF tables
+  scienceReviewList <- unique(files[grep("science_review_flags", files)])
   files <- files[grep(".h5$", files)]
   
   # check for duplicate files and use the most recent
@@ -106,6 +107,11 @@ stackEddy <- function(filepath, level="dp04", var=NA, avg=NA) {
                     max(files[grep(i, files)]))
     }
     files <- maxFiles
+  }
+  
+  # check for no files
+  if(identical(length(files), as.integer(0))) {
+    stop("No .h5 files found in specified file path. Check the inputs and file contents.")
   }
   
   # make empty, named list for the data tables
@@ -327,8 +333,9 @@ stackEddy <- function(filepath, level="dp04", var=NA, avg=NA) {
   # join the concatenated tables
 
   sites <- unique(substring(names(timeMergList), 1, 4))
-  varMergList <- vector("list", length(sites)+3)
-  names(varMergList) <- c(sites, "variables", "objDesc", "issueLog")
+  varMergList <- vector("list", length(sites)+4)
+  names(varMergList) <- c(sites, "variables", "objDesc", 
+                          "issueLog", "scienceReviewFlags")
   
   # set up progress bar
   writeLines(paste0("Joining data variables"))
@@ -337,7 +344,7 @@ stackEddy <- function(filepath, level="dp04", var=NA, avg=NA) {
   idx <- 0
   
   # make one merged table per site
-  for(m in 1:I(length(varMergList)-3)) {
+  for(m in 1:I(length(varMergList)-4)) {
     
     timeMergPerSite <- timeMergList[grep(sites[m], names(timeMergList))]
 
@@ -407,6 +414,12 @@ stackEddy <- function(filepath, level="dp04", var=NA, avg=NA) {
   utils::setTxtProgressBar(pb3, 1)
   close(pb3)
 
+  
+  # site attributes, objDesc, SRF table, and issue log
+  writeLines(paste0("Getting metadata tables"))
+  pb4 <- utils::txtProgressBar(style=3)
+  utils::setTxtProgressBar(pb4, 0)
+  
   # get one objDesc table and add it and variables table to list
   objDesc <- base::try(rhdf5::h5read(files[1], name="//objDesc"), silent=T)
   # if processing gets this far without failing, don't fail here, just return data without objDesc table
@@ -416,6 +429,8 @@ stackEddy <- function(filepath, level="dp04", var=NA, avg=NA) {
   varMergList[["variables"]] <- variables
   varMergList[["objDesc"]] <- objDesc
   
+  utils::setTxtProgressBar(pb4, 0.5)
+  
   # get issue log
   if(!curl::has_internet()) {
     message("No internet connection, issue log file not accessed. Issue log can be found on the data product details pages.")
@@ -423,6 +438,53 @@ stackEddy <- function(filepath, level="dp04", var=NA, avg=NA) {
     # token not used here, since token is not otherwise used/accessible in this function
     varMergList[["issueLog"]] <- getIssueLog(dpID="DP4.00200.001")
   }
+  
+  utils::setTxtProgressBar(pb4, 0.75)
+  
+  # aggregate the science_review_flags files
+  if(length(scienceReviewList)>0) {
+    outputScienceReview <- data.table::rbindlist(lapply(scienceReviewList, 
+                                                                   function(x) {
+                                                                     
+              outTbl <- data.table::fread(x, header=TRUE, encoding="UTF-8", keepLeadingZeros = TRUE,
+                                      colClasses = list(character = c('startDateTime','endDateTime',
+                                                                      'createDateTime',
+                                                                      'lastUpdateDateTime')))
+                            if(identical(nrow(outTbl), as.integer(0))) {
+                                return()
+                            }
+                            return(outTbl)
+                  }), fill=TRUE)
+    
+    # remove duplicates
+    outputScienceReview <- unique(outputScienceReview)
+    
+    # check for non-identical duplicates with the same ID and keep the most recent one
+    if(length(unique(outputScienceReview$srfID))!=nrow(outputScienceReview)) {
+      dupRm <- numeric()
+      rowids <- 1:nrow(outputScienceReview)
+      origNames <- colnames(outputScienceReview)
+      outputScienceReview <- cbind(rowids, outputScienceReview)
+      for(k in unique(outputScienceReview$srfID)) {
+        scirvwDup <- outputScienceReview[which(outputScienceReview$srfID==k),]
+        if(nrow(scirvwDup)>1) {
+          dupRm <- c(dupRm, 
+                     scirvwDup$rowids[which(scirvwDup$lastUpdateDateTime!=max(scirvwDup$lastUpdateDateTime))])
+        }
+      }
+      if(length(dupRm)>0) {
+        outputScienceReview <- outputScienceReview[-dupRm,origNames]
+      } else {
+        outputScienceReview <- outputScienceReview[,origNames]
+      }
+    }
+    varMergList[["scienceReviewFlags"]] <- outputScienceReview
+  } else {
+    varMergList <- varMergList[-grep("scienceReviewFlags", names(varMergList))]
+  }
+  
+  utils::setTxtProgressBar(pb4, 1)
+  close(pb4)
   
   return(varMergList)
 }
