@@ -33,6 +33,7 @@ stackDataFilesParallel <- function(folder, nCores=1, dpID){
   
   starttime <- Sys.time()
   messages <- character()
+  releases <- character()
   
   # get the in-memory list of table types (site-date, site-all, etc.). This list must be updated often.
   #data("table_types")
@@ -44,6 +45,15 @@ stackDataFilesParallel <- function(folder, nCores=1, dpID){
   
   # filenames with full path
   filepaths <- findDatatables(folder = folder, fnames = T)
+  
+  # get release file, if it exists
+  relfl <- grep("release_status", filepaths)
+  if(length(relfl)==1) {
+    reltab <- data.table::fread(filepaths[relfl],
+                                header=TRUE, encoding="UTF-8")
+  } else {
+    reltab <- NA
+  }
   
   # handle per-sample tables separately
   if(dpID %in% c("DP1.30012.001", "DP1.10081.001", "DP1.20086.001", "DP1.20141.001") & 
@@ -187,12 +197,34 @@ stackDataFilesParallel <- function(folder, nCores=1, dpID){
             labpath <- getRecentPublication(filepaths[grep(x, filepaths)])
             
             if(nchar(labpath[[1]]) > 260 & Sys.info()[["sysname"]]=="Windows") {
-              warning(paste("Filepath", labpath[[1]], "is", nchar(labpath[[1]]), "characters long. Filepaths on Windows are limited to 260 characters. Move files closer to the root directory, or, if you are using loadByProduct(), switch to using zipsByProduct() followed by stackByTable()."))
+              warning(paste("Filepath", labpath[[1]], "is", nchar(labpath[[1]]), "characters long. Filepaths longer than 260 characters can cause problems in Windows operating systems. Updating to R version 4.3.0 and higher resolves this issue. If updating R is not an option, move files closer to the root directory, or, if you are using loadByProduct(), switch to using zipsByProduct() followed by stackByTable()."))
             }
             
             outputj <- data.table::fread(labpath[[1]], header=TRUE, encoding="UTF-8")
             outputj <- assignClasses(outputj, variables)
             outputj$publicationDate <- rep(labpath[[2]], nrow(outputj))
+            
+            # add column for release tag, if available
+            outputj$release <- rep(NA, nrow(outputj))
+            dir.splitName <- strsplit(dirname(filepaths[grep(x, filepaths)]), split = "\\.")
+            relind <- grep("RELEASE|PROVISIONAL|LATEST", dir.splitName[[1]])
+            if(length(relind)>0) {
+              outputj$release <- rep(dir.splitName[[1]][relind],
+                                     nrow(outputj))
+            } else {
+              if(all(!is.na(reltab))) {
+                if(basename(filepaths[grep(x, filepaths)]) %in% reltab$name) {
+                  outputj$release <- rep(reltab$release[which(reltab$name==
+                                                                basename(filepaths[grep(x, filepaths)]))],
+                                         nrow(outputj))
+                } else {
+                  outputj$release <- rep("undetermined", nrow(outputj))
+                }
+              } else {
+                outputj$release <- rep("undetermined", nrow(outputj))
+              }
+            }
+            
             return(outputj)
             }, filepaths=filepaths), fill=TRUE)
           
@@ -395,13 +427,21 @@ stackDataFilesParallel <- function(folder, nCores=1, dpID){
         # add column for release tag, if available
         tabtemp$release <- rep(NA, nrow(tabtemp))
         dir.splitName <- strsplit(dirname(x), split = "\\.")
-        pubd <- grep("[0-9]{8}T[0-9]{6}Z", dir.splitName[[1]])
-        if(identical(as.integer(pubd), 
-                     as.integer(length(dir.splitName[[1]])-1))) {
-          tabtemp$release <- rep(dir.splitName[[1]][length(dir.splitName[[1]])],
+        relind <- grep("RELEASE|PROVISIONAL|LATEST", dir.splitName[[1]])
+        if(length(relind)==1) {
+          tabtemp$release <- rep(dir.splitName[[1]][relind],
                                  nrow(tabtemp))
         } else {
-          tabtemp$release <- rep("undetermined", nrow(tabtemp))
+          if(all(!is.na(reltab))) {
+            if(basename(x) %in% reltab$name) {
+              tabtemp$release <- rep(reltab$release[which(reltab$name==basename(x))],
+                                     nrow(tabtemp))
+            } else {
+              tabtemp$release <- rep("undetermined", nrow(tabtemp))
+            }
+          } else {
+            tabtemp$release <- rep("undetermined", nrow(tabtemp))
+          }
         }
         
         return(tabtemp)
@@ -429,6 +469,7 @@ stackDataFilesParallel <- function(folder, nCores=1, dpID){
             if("release" %in% names(stackedDf)) {
               vlist[[vtable]] <- data.table::rbindlist(list(vlist[[vtable]], 
                                                             c(table=tables[i], added_fields[6,])), fill=TRUE)
+              releases <- c(releases, unique(stackedDf$release))
             }
           }
         }
@@ -455,6 +496,29 @@ stackDataFilesParallel <- function(folder, nCores=1, dpID){
       utils::write.csv(issues, paste0(folder, "/stackedFiles/issueLog_", dpnum, ".csv"),
                        row.names=FALSE)
       m <- m + 1
+    }
+  }
+  
+  # get DOIs and generate citation(s)
+  releases <- unique(releases)
+  if("PROVISIONAL" %in% releases) {
+    cit <- try(getCitation(dpID=dpID, release="PROVISIONAL"), silent=TRUE)
+    if(!inherits(cit, "try-error")) {
+      base::write(cit, paste0(folder, "/stackedFiles/citation_", dpnum, "_PROVISIONAL", ".txt"))
+    }
+  }
+  if(length(grep("RELEASE", releases))==0) {
+    releases <- releases
+  } else {
+    if(length(grep("RELEASE", releases))>1) {
+      unlink(paste0(folder, "/stackedFiles/"), recursive=TRUE)
+      stop("Multiple data releases were stacked together. This is not appropriate, check your input data.")
+    } else {
+      rel <- releases[grep("RELEASE", releases)]
+      cit <- try(getCitation(dpID=dpID, release=rel), silent=TRUE)
+      if(!inherits(cit, "try-error")) {
+        base::write(cit, paste0(folder, "/stackedFiles/citation_", dpnum, "_", rel, ".txt"))
+      }
     }
   }
   

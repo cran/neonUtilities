@@ -116,6 +116,11 @@ zipsByProduct <- function(dpID, site="all", startdate=NA, enddate=NA, package="b
   if(dpID %in% c("DP1.00033.001", "DP1.00042.001")) {
     stop(paste(dpID, "is a phenological image product, data are hosted by Phenocam.", sep=" "))
   }
+
+  # error for Aeronet data
+  if(dpID %in% c("DP1.00043.001")) {
+    stop(paste("Spectral sun photometer (", dpID, ") data are hosted by Aeronet.", sep=""))
+  }
   
   # error for DHP expanded package
   if(dpID=="DP1.10017.001" & package=="expanded") {
@@ -394,6 +399,15 @@ zipsByProduct <- function(dpID, site="all", startdate=NA, enddate=NA, package="b
       }
 
     }
+  }
+  
+  # for individual file downloads, get release status of each file
+  # add for eddy as well (need to adjust unzipping routine in stackEddy())
+  if(avg!="all" | tabl!="all") {
+    utils::write.csv(zip.urls[,c("name","release")], file=paste(filepath, "/release_status_",
+                                                                paste0(gsub("\\D", "", Sys.time()), 
+                                                                       collapse=""), ".csv", sep=""),
+                     row.names=F)
   }
 
   utils::setTxtProgressBar(pb, 1)

@@ -16,6 +16,7 @@
 #' @param dpID Data product ID of product to stack. Ignored and determined from data unless input is a vector of files, generally via stackFromStore().
 #' @param package Data download package, either basic or expanded. Ignored and determined from data unless input is a vector of files, generally via stackFromStore().
 #' @param nCores The number of cores to parallelize the stacking procedure. To automatically use the maximum number of cores on your machine we suggest setting nCores=parallel::detectCores(). By default it is set to a single core.
+#' @param useFasttime Should the fasttime package be used to read date-time variables? Only relevant if savepath="envt". Defaults to false.
 #' @return All files are unzipped and one file for each table type is created and written. If savepath="envt" is specified, output is a named list of tables; otherwise, function output is null and files are saved to the location specified.
 
 #' @examples
@@ -47,7 +48,14 @@
 #     * Add handling for input vector of file names; enables working with stackFromStore()
 ##############################################################################################
 
-stackByTable <- function(filepath, savepath=NA, folder=FALSE, saveUnzippedFiles=FALSE, dpID=NA, package=NA, nCores=1){
+stackByTable <- function(filepath, 
+                         savepath=NA, 
+                         folder=FALSE, 
+                         saveUnzippedFiles=FALSE, 
+                         dpID=NA, 
+                         package=NA, 
+                         nCores=1,
+                         useFasttime=FALSE){
 
   if(length(filepath)>1) {
     folder <- "ls"
@@ -74,7 +82,7 @@ stackByTable <- function(filepath, savepath=NA, folder=FALSE, saveUnzippedFiles=
   }
 
   if(folder==TRUE){
-    files <- list.files(filepath, pattern = "NEON.D[[:digit:]]{2}.[[:alpha:]]{4}.")
+    files <- list.files(filepath, pattern = "NEON.D[[:digit:]]{2}.[[:alpha:]]{4}.|release_status")
     if(length(files)==0) {
       stop("Data files are not present in specified filepath.")
     }
@@ -126,6 +134,11 @@ stackByTable <- function(filepath, savepath=NA, folder=FALSE, saveUnzippedFiles=
   # error message for SAE data
   if(dpID == "DP4.00200.001"){
     stop("This eddy covariance data product is in HDF5 format. Stack using stackEddy()")
+  }
+  
+  # check for fasttime package, if used
+  if(useFasttime & !requireNamespace("fasttime", quietly=T)) {
+    stop("Parameter useFasttime is TRUE but fasttime package is not installed. Install and re-try.")
   }
 
   if(dpID == "DP1.10017.001" && package != 'basic'){
@@ -216,7 +229,8 @@ stackByTable <- function(filepath, savepath=NA, folder=FALSE, saveUnzippedFiles=
   }
 
   stackDataFilesParallel(savepath, nCores, dpID)
-  getReadmePublicationDate(savepath, out_filepath = paste(savepath, "stackedFiles", sep="/"), dpID)
+  try(getReadmePublicationDate(savepath, out_filepath = paste(savepath, "stackedFiles", sep="/"), dpID), 
+      silent=T)
 
   if(saveUnzippedFiles == FALSE & envt!=1){
     zipList <- unlist(zipList)
@@ -241,17 +255,19 @@ stackByTable <- function(filepath, savepath=NA, folder=FALSE, saveUnzippedFiles=
         fls <- suppressWarnings(data.table::fread(x, sep=',', keepLeadingZeros = TRUE, colClasses = list(character = c('HOR.VER'))))
       } else if(length(grep("readme", basename(x)))>0) {
         fls <- suppressMessages(utils::read.delim(x, header=FALSE, quote=""))
-        } else if(length(grep("variables", basename(x)))>0 | length(grep("validation", basename(x)))>0 |
-                  length(grep("categoricalCodes", basename(x)))>0) {
+      } else if(length(grep("variables", basename(x)))>0 | length(grep("validation", basename(x)))>0 |
+                length(grep("categoricalCodes", basename(x)))>0) {
+        fls <- suppressWarnings(data.table::fread(x, sep=",", header=TRUE, 
+                                                  encoding="UTF-8", keepLeadingZeros=TRUE))
+      } else if(length(grep("citation", basename(x)))>0) {
+        fls <- suppressWarnings(paste(readLines(x), collapse="\n"))
+      } else {
+        fls <- try(readTableNEON(dataFile=x, varFile=v, useFasttime=useFasttime), silent=T)
+        if(inherits(fls, 'try-error')) {
           fls <- suppressWarnings(data.table::fread(x, sep=",", header=TRUE, 
                                                     encoding="UTF-8", keepLeadingZeros=TRUE))
-        } else {
-          fls <- try(readTableNEON(x, v), silent=T)
-          if(inherits(fls, 'try-error')) {
-            fls <- suppressWarnings(data.table::fread(x, sep=",", header=TRUE, 
-                                                      encoding="UTF-8", keepLeadingZeros=TRUE))
-          }
-          return(fls)
+        }
+        return(fls)
       }
     })
     names(stacked_list) <- substring(basename(stacked_files), 1, nchar(basename(stacked_files))-4)
