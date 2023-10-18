@@ -12,11 +12,12 @@
 #' @param startdate Either NA, meaning all available dates, or a character vector in the form YYYY-MM, e.g. 2017-01. Defaults to NA.
 #' @param enddate Either NA, meaning all available dates, or a character vector in the form YYYY-MM, e.g. 2017-01. Defaults to NA.
 #' @param package Either 'basic' or 'expanded', indicating which data package to download. Defaults to basic.
-#' @param release The data release to be downloaded; either 'current' or the name of a release, e.g. 'RELEASE-2021'. 'current' returns provisional data in addition to the most recent release. To download only provisional data, use release='PROVISIONAL'. Defaults to 'current'.
+#' @param release The data release to be downloaded; either 'current' or the name of a release, e.g. 'RELEASE-2021'. 'current' returns the most recent release, as well as provisional data if include.provisional is set to TRUE. To download only provisional data, use release='PROVISIONAL'. Defaults to 'current'.
 #' @param avg Deprecated; use timeIndex
 #' @param timeIndex Either the string 'all', or the time index of data to download, in minutes. Only applicable to sensor (IS) data. Defaults to 'all'.
 #' @param tabl Either the string 'all', or the name of a single data table to download. Defaults to 'all'.
 #' @param check.size T or F, should the user approve the total file size before downloading? Defaults to T. When working in batch mode, or other non-interactive workflow, use check.size=F.
+#' @param include.provisional T or F, should provisional data be included in downloaded files? Defaults to F. See https://www.neonscience.org/data-samples/data-management/data-revisions-releases for details on the difference between provisional and released data.
 #' @param savepath The location to save the output files to
 #' @param load T or F, are files saved locally or loaded directly? Used silently with loadByProduct(), do not set manually.
 #' @param token User specific API token (generated within neon.datascience user accounts). Optional.
@@ -45,7 +46,8 @@
 
 zipsByProduct <- function(dpID, site="all", startdate=NA, enddate=NA, package="basic",
                           release="current", timeIndex="all", tabl="all", check.size=TRUE, 
-                          savepath=NA, load=F, token=NA_character_, avg=NA) {
+                          include.provisional=FALSE, savepath=NA, load=F, 
+                          token=NA_character_, avg=NA) {
 
   messages <- NA
 
@@ -181,6 +183,17 @@ zipsByProduct <- function(dpID, site="all", startdate=NA, enddate=NA, package="b
                newDPID, sep=""))
   }
   
+  # check for incompatible values of release= and include.provisional=
+  if(release=="PROVISIONAL" & isFALSE(include.provisional)) {
+    stop("Download request is for release=PROVISIONAL. To download PROVISIONAL data, enter input parameter include.provisional=TRUE.")
+  }
+  if(grepl(pattern="RELEASE", x=release) & isTRUE(include.provisional)) {
+    warning(paste("Download request is for release=", release, 
+                  " but include.provisional=TRUE. Only data in ", release, 
+                  " will be downloaded."), 
+            sep="")
+  }
+  
   # if token is an empty string, set to NA
   if(identical(token, "")) {
     token <- NA_character_
@@ -289,7 +302,9 @@ zipsByProduct <- function(dpID, site="all", startdate=NA, enddate=NA, package="b
   }
 
   zip.urls <- getZipUrls(month.urls, avg=avg, package=package, dpID=dpID, tabl=tabl,
-                         release=release, messages=messages, token=token)
+                         release=release, messages=messages, 
+                         include.provisional=include.provisional,
+                         token=token)
   if(is.null(zip.urls)) { return(invisible()) }
   zip.urls <- tidyr::drop_na(zip.urls)
 

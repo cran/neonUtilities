@@ -1,6 +1,6 @@
 Package: neonUtilities
-Version: 2.3.0
-Date: 2023-07-05
+Version: 2.4.0
+Date: 2023-10-17
 Title: Utilities for Working with NEON Data
 Authors@R: c(person("Claire","Lunch",email="clunch@battelleecology.org",role=c("aut","cre","ctb")), person("Christine","Laney",role=c("aut","ctb")), person("Nathan","Mietkiewicz",role=c("aut","ctb")), person("Eric","Sokol",role=c("aut","ctb")), person("Kaelin","Cawley",role=c("aut","ctb")), person("NEON (National Ecological Observatory Network)", role="aut"))
 Description: NEON data packages can be accessed through the NEON Data Portal <https://www.neonscience.org>
@@ -20,7 +20,7 @@ Encoding: UTF-8
 LazyData: true
 RoxygenNote: 7.2.3
 NeedsCompilation: no
-Packaged: 2023-07-05 15:32:13 UTC; clunch
+Packaged: 2023-10-17 23:39:52 UTC; clunch
 Author: Claire Lunch [aut, cre, ctb],
   Christine Laney [aut, ctb],
   Nathan Mietkiewicz [aut, ctb],
@@ -29,4 +29,4 @@ Author: Claire Lunch [aut, cre, ctb],
   NEON (National Ecological Observatory Network) [aut]
 Maintainer: Claire Lunch <clunch@battelleecology.org>
 Repository: CRAN
-Date/Publication: 2023-07-06 00:11:02 UTC
+Date/Publication: 2023-10-18 04:10:02 UTC

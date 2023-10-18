@@ -56,7 +56,8 @@ stackDataFilesParallel <- function(folder, nCores=1, dpID){
   }
   
   # handle per-sample tables separately
-  if(dpID %in% c("DP1.30012.001", "DP1.10081.001", "DP1.20086.001", "DP1.20141.001") & 
+  if(dpID %in% c("DP1.30012.001", "DP1.10081.001", "DP1.20086.001", 
+                 "DP1.20141.001", "DP1.20190.001", "DP1.20193.001") & 
      length(grep("^NEON.", basename(filenames), invert=TRUE))>0) {
     framefiles <- filepaths[grep("^NEON.", basename(filenames), invert=TRUE)]
     filepaths <- filepaths[grep("^NEON.", basename(filenames))]
@@ -71,7 +72,17 @@ stackDataFilesParallel <- function(folder, nCores=1, dpID){
       tempf$fileName <- rep(basename(x), nrow(tempf))
       return(tempf)
       }), fill=TRUE)
-    data.table::fwrite(frm, paste0(folder, "/stackedFiles/", "per_sample", ".csv"))
+    
+    if(dpID=="DP1.20190.001") {
+      data.table::fwrite(frm, paste0(folder, "/stackedFiles/", "rea_conductivityRawData", ".csv"))
+    } else {
+      if(dpID=="DP1.20193.001") {
+        data.table::fwrite(frm, paste0(folder, "/stackedFiles/", "sbd_conductivityRawData", ".csv"))
+      } else {
+      data.table::fwrite(frm, paste0(folder, "/stackedFiles/", "per_sample", ".csv"))
+      }
+    }
+    
   }
   
   # make a list, where filenames are the keys to the filepath values
