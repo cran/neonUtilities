@@ -15,7 +15,8 @@
 #' @param include.provisional T or F, should provisional data be included in downloaded files? Defaults to F. See https://www.neonscience.org/data-samples/data-management/data-revisions-releases for details on the difference between provisional and released data.
 #' @param check.size T or F, should the user approve the total file size before downloading? Defaults to T. When working in batch mode, or other non-interactive workflow, use check.size=F.
 #' @param savepath The file path to download to. Defaults to NA, in which case the working directory is used.
-#' @param token User specific API token (generated within data.neonscience user accounts)
+#' @param token User specific API token (generated within data.neonscience.org user accounts)
+#' @param progress T or F, should progress bars be printed? Defaults to TRUE.
 
 #' @return A folder in the working directory, containing all files meeting query criteria.
 
@@ -39,7 +40,8 @@
 byFileAOP <- function(dpID, site, year, 
                       include.provisional=FALSE,
                       check.size=TRUE, savepath=NA, 
-                      token=NA_character_) {
+                      token=NA_character_,
+                      progress=TRUE) {
 
   # error message if dpID isn't formatted as expected
   if(regexpr("DP[1-4]{1}.[0-9]{5}.00[1-2]{1}",dpID)!=1) {
@@ -61,10 +63,13 @@ byFileAOP <- function(dpID, site, year,
     token <- NA_character_
   }
   
+  # check for token expiration
+  token <- tokenCheck(token)
+  
   releases <- character()
   
   # query the products endpoint for the product requested
-  req <- getAPI(paste("http://data.neonscience.org/api/v0/products/", dpID, sep=""), token)
+  req <- getAPI(paste("https://data.neonscience.org/api/v0/products/", dpID, sep=""), token)
   avail <- jsonlite::fromJSON(httr::content(req, as="text", encoding="UTF-8"), 
                               simplifyDataFrame=TRUE, flatten=TRUE)
 
@@ -132,7 +137,9 @@ byFileAOP <- function(dpID, site, year,
       stop("Download halted.")
     }
   } else {
-    cat(paste("Downloading files totaling approximately", downld.size.read, "\n", sep=" "))
+    if(isTRUE(progress)) {
+      message(paste("Downloading files totaling approximately", downld.size.read, "\n", sep=" "))
+    }
     }
 
   # create folder in working directory to put files in
@@ -152,17 +159,18 @@ byFileAOP <- function(dpID, site, year,
 
   # copy zip files into folder
   j <- 1
-  messages <- list()
-  writeLines(paste("Downloading ", nrow(file.urls.current[[1]]), " files", sep=""))
-  pb <- utils::txtProgressBar(style=3)
-  utils::setTxtProgressBar(pb, 1/(nrow(file.urls.current[[1]])-1))
+  if(isTRUE(progress)) {
+    message(paste("Downloading ", nrow(file.urls.current[[1]]), " files", sep=""))
+    pb <- utils::txtProgressBar(style=3)
+    utils::setTxtProgressBar(pb, 1/(nrow(file.urls.current[[1]])-1))
+  }
 
   counter <- 1
 
   while(j <= nrow(file.urls.current[[1]])) {
 
     if (counter > 2) {
-      cat(paste0("\nRefresh did not solve the isse. URL query for file ", file.urls.current[[1]]$name[j],
+      message(paste0("Refresh did not solve the isse. URL query for file ", file.urls.current[[1]]$name[j],
                   " failed. If all files fail, check data portal (data.neonscience.org/news) for possible outage alert.\n",
                  "If file sizes are large, increase the timeout limit on your machine: options(timeout=###)"))
 
@@ -201,7 +209,7 @@ byFileAOP <- function(dpID, site, year,
         
         # re-attempt download once with no changes
         if(counter < 2) {
-          writeLines(paste0("\n", file.urls.current[[1]]$name[j], " could not be downloaded. Re-attempting."))
+          message(paste0("\n", file.urls.current[[1]]$name[j], " could not be downloaded. Re-attempting."))
           t <- tryCatch(
             {
               suppressWarnings(downloader::download(file.urls.current[[1]]$URL[j],
@@ -212,12 +220,12 @@ byFileAOP <- function(dpID, site, year,
           if(inherits(t, "error")) {
             counter <- counter + 1
           } else {
-            messages[j] <- paste(file.urls.current[[1]]$name[j], "downloaded to", newpath, sep=" ")
+            #message(paste(file.urls.current[[1]]$name[j], "downloaded to", newpath, sep=" "))
             j <- j + 1
             counter <- 1
           }
         } else {
-          writeLines(paste0("\n", file.urls.current[[1]]$name[j], " could not be downloaded. URLs may have expired. Refreshing URL list."))
+          message(paste0("\n", file.urls.current[[1]]$name[j], " could not be downloaded. URLs may have expired. Refreshing URL list."))
           file.urls.new <- getFileUrls(month.urls, include.provisional=include.provisional, 
                                        token=token)
           file.urls.current <- file.urls.new
@@ -225,17 +233,22 @@ byFileAOP <- function(dpID, site, year,
         }
 
       } else {
-        messages[j] <- paste(file.urls.current[[1]]$name[j], "downloaded to", newpath, sep=" ")
+        #message(paste(file.urls.current[[1]]$name[j], "downloaded to", newpath, sep=" "))
         j <- j + 1
         counter <- 1
         releases <- c(releases, file.urls.current[[2]])
-        utils::setTxtProgressBar(pb, j/(nrow(file.urls.current[[1]])-1))
+        if(isTRUE(progress)) {
+          utils::setTxtProgressBar(pb, j/(nrow(file.urls.current[[1]])-1))
+        }
+        
       }
       
     }
   }
-  utils::setTxtProgressBar(pb, 1)
-  close(pb)
+  if(isTRUE(progress)) {
+    utils::setTxtProgressBar(pb, 1)
+    close(pb)
+  }
   
   # get issue log and write to file
   issues <- getIssueLog(dpID=dpID, token=token)
@@ -262,6 +275,8 @@ byFileAOP <- function(dpID, site, year,
     }
   }
 
-  writeLines(paste("Successfully downloaded ", length(messages), " files to ", filepath, sep=""))
-  #writeLines(paste0(messages, collapse = "\n")) # removed in v2.2.0, file lists were excessively long
+  if(isTRUE(progress)) {
+    message(paste("Successfully downloaded ", j, " files to ", filepath, sep=""))
+  }
+  
 }

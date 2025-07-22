@@ -7,18 +7,22 @@
 stackByTable(
   filepath,
   savepath = NA,
+  cloud.mode = FALSE,
   folder = FALSE,
   saveUnzippedFiles = FALSE,
   dpID = NA,
   package = NA,
   nCores = 1,
-  useFasttime = FALSE
+  useFasttime = FALSE,
+  progress = TRUE
 )
 }
 \arguments{
 \item{filepath}{The location of the zip file}
 
 \item{savepath}{The location to save the output files to}
+
+\item{cloud.mode}{Are files being transferred directly to a cloud environment?}
 
 \item{folder}{T or F: does the filepath point to a parent, unzipped folder, or a zip file? If F, assumes the filepath points to a zip file. Defaults to F. No longer needed; included for back compatibility.}
 
@@ -31,6 +35,8 @@ stackByTable(
 \item{nCores}{The number of cores to parallelize the stacking procedure. To automatically use the maximum number of cores on your machine we suggest setting nCores=parallel::detectCores(). By default it is set to a single core.}
 
 \item{useFasttime}{Should the fasttime package be used to read date-time variables? Only relevant if savepath="envt". Defaults to false.}
+
+\item{progress}{T or F: should progress bars be printed? Defaults to TRUE.}
 }
 \value{
 All files are unzipped and one file for each table type is created and written. If savepath="envt" is specified, output is a named list of tables; otherwise, function output is null and files are saved to the location specified.

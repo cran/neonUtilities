@@ -11,6 +11,8 @@
 #' @param savepath The root folder directory where the ReadMe files are located.
 #' @param out_filepath The output directory and filename.
 #' @param dpID The data product identifier
+#' 
+#' @keywords internal
 
 #' @references
 #' License: GNU AFFERO GENERAL PUBLIC LICENSE Version 3, 19 November 2007
@@ -31,7 +33,7 @@ getReadmePublicationDate <- function(savepath, out_filepath, dpID) {
   readme_list <- list.files(savepath, pattern = '.readme.',
                             recursive = TRUE, full.names = TRUE)
   if(length(readme_list)==0) {
-    writeLines("No readme file found.\n")
+    message("No readme file found")
   } else {
 
     readme_recent <- getRecentPublication(readme_list)[[1]]

@@ -7,7 +7,7 @@
 getEddyLog(token = NA_character_)
 }
 \arguments{
-\item{token}{User specific API token (generated within neon.datascience user accounts)}
+\item{token}{User specific API token (generated within data.neonscience.org user accounts)}
 }
 \value{
 A table of issues reported for the data product.
@@ -21,3 +21,4 @@ License: GNU AFFERO GENERAL PUBLIC LICENSE Version 3, 19 November 2007
 \author{
 Claire Lunch \email{clunch@battelleecology.org}
 }
+\keyword{internal}

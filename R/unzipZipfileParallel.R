@@ -12,6 +12,9 @@
 #' @param outpath The name of the folder to save unpacked files to
 #' @param level Whether the unzipping should occur only for the 'top' zip file, or unzip 'all' recursively, or only files 'in' the folder specified
 #' @param nCores Number of cores to use for parallelization
+#' @param progress T or F, should progress bars be printed?
+#' 
+#' @keywords internal
 
 #' @references
 #' License: GNU AFFERO GENERAL PUBLIC LICENSE Version 3, 19 November 2007
@@ -22,8 +25,13 @@
 #   2018-04-03 (Christine Laney): Replacement of line-by-line message of unzipping files with a progress bar
 ##############################################################################################
 
-unzipZipfileParallel <- function(zippath, outpath = substr(zippath, 1, nchar(zippath)-4), level="all", nCores=1){
+unzipZipfileParallel <- function(zippath, outpath = substr(zippath, 1, nchar(zippath)-4), 
+                                 level="all", nCores=1, progress=TRUE){
 
+  if(isFALSE(progress)) {
+    pborig <- pbapply::pboptions(type="none")
+  }
+  
   if(level == "all") {
     tl <- utils::unzip(zipfile = zippath, list=TRUE)
     if(any(nchar(tl)>260) & Sys.info()[["sysname"]]=="Windows") {
@@ -32,7 +40,9 @@ unzipZipfileParallel <- function(zippath, outpath = substr(zippath, 1, nchar(zip
     
     utils::unzip(zipfile = zippath, exdir=outpath)
     zps <- listZipfiles(zippath)
-    writeLines(paste0("Unpacking zip files using ", nCores, " cores."))
+    if(isTRUE(progress)) {
+      message(paste0("Unpacking zip files using ", nCores, " cores."))
+    }
 
     if(length(zps) >= 1){
 
@@ -58,13 +68,20 @@ unzipZipfileParallel <- function(zippath, outpath = substr(zippath, 1, nchar(zip
       outpath=outpath, cl=cl)
 
     } else {
-      writeLines("This zip file doesn't contain monthly data packages") }
+      message("This zip file doesn't contain monthly data packages") }
+    
+    if(isFALSE(progress)) {
+      pbapply::pboptions(pborig)
+    }
+    
     return(zps)
   }
 
   if(level == "in") {
     zps <- as.list(grep(list.files(zippath, full.names=TRUE), pattern = '*.zip', value=TRUE))
-    writeLines(paste0("Unpacking zip files using ", nCores, " cores."))
+    if(isTRUE(progress)) {
+      message(paste0("Unpacking zip files using ", nCores, " cores."))
+    }
 
     if(length(zps) >= 1) {
 
@@ -86,7 +103,7 @@ unzipZipfileParallel <- function(zippath, outpath = substr(zippath, 1, nchar(zip
           
           utils::unzip(z, exdir=substr(o, 1, nchar(o)-4))
         } else {
-          writeLines(paste0("Skipping ",  z, " because these files have already been unpacked."))
+          message(paste0("Skipping ",  z, " because these files have already been unpacked."))
         }
         if (file.exists(z)) {
             file.remove(z)
@@ -94,8 +111,13 @@ unzipZipfileParallel <- function(zippath, outpath = substr(zippath, 1, nchar(zip
         },
         outpath=outpath, cl=cl)
     } else {
-        writeLines("This zip file doesn't contain monthly data packages")
+        message("This zip file doesn't contain monthly data packages")
     }
+    
+    if(isFALSE(progress)) {
+      pbapply::pboptions(pborig)
+    }
+    
     return(zps)
   }
 }

@@ -13,13 +13,15 @@ loadByProduct(
   release = "current",
   timeIndex = "all",
   tabl = "all",
+  cloud.mode = FALSE,
   check.size = TRUE,
   include.provisional = FALSE,
   nCores = 1,
   forceParallel = FALSE,
   token = NA_character_,
   useFasttime = FALSE,
-  avg = NA
+  avg = NA,
+  progress = TRUE
 )
 }
 \arguments{
@@ -39,6 +41,8 @@ loadByProduct(
 
 \item{tabl}{Either the string 'all', or the name of a single data table to download. Defaults to 'all'.}
 
+\item{cloud.mode}{T or F, are files transferred cloud-to-cloud? Defaults to F; set to true only if the destination location (where you are downloading the files to) is in the cloud.}
+
 \item{check.size}{T or F, should the user approve the total file size before downloading? Defaults to T. When working in batch mode, or other non-interactive workflow, use check.size=F.}
 
 \item{include.provisional}{T or F, should provisional data be included in downloaded files? Defaults to F. See https://www.neonscience.org/data-samples/data-management/data-revisions-releases for details on the difference between provisional and released data.}
@@ -47,11 +51,13 @@ loadByProduct(
 
 \item{forceParallel}{If the data volume to be processed does not meet minimum requirements to run in parallel, this overrides. Set to FALSE as default.}
 
-\item{token}{User specific API token (generated within neon.datascience user accounts)}
+\item{token}{User specific API token (generated within data.neonscience.org user accounts)}
 
 \item{useFasttime}{Should the fasttime package be used to read date-time fields? Defaults to false.}
 
 \item{avg}{Deprecated; use timeIndex}
+
+\item{progress}{T or F, should progress bars be printed? Defaults to TRUE.}
 }
 \value{
 A named list of all the data tables in the data product downloaded, plus a validation file and a variables file, as available.

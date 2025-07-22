@@ -10,10 +10,10 @@ getZipUrls(
   package,
   dpID,
   release,
-  messages,
   tabl,
   include.provisional,
-  token = NA_character_
+  token = NA_character_,
+  progress = TRUE
 )
 }
 \arguments{
@@ -27,13 +27,13 @@ getZipUrls(
 
 \item{release}{Data release to be downloaded}
 
-\item{messages}{Error/warning messages from previous steps}
-
 \item{tabl}{Table name to get}
 
 \item{include.provisional}{Should provisional data be included?}
 
-\item{token}{User specific API token (generated within neon.datascience user accounts)}
+\item{token}{User specific API token (generated within data.neonscience.org user accounts)}
+
+\item{progress}{T or F: should progress bars be printed?}
 }
 \value{
 A dataframe comprised of file names, S3 URLs, file size, and download status (default = 0)
@@ -48,3 +48,4 @@ License: GNU AFFERO GENERAL PUBLIC LICENSE Version 3, 19 November 2007
 Claire Lunch \email{clunch@battelleecology.org}
 Christine Laney \email{claney@battelleecology.org}
 }
+\keyword{internal}

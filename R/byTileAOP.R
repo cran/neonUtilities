@@ -18,7 +18,8 @@
 #' @param include.provisional T or F, should provisional data be included in downloaded files? Defaults to F. See https://www.neonscience.org/data-samples/data-management/data-revisions-releases for details on the difference between provisional and released data.
 #' @param check.size T or F, should the user approve the total file size before downloading? Defaults to T. When working in batch mode, or other non-interactive workflow, use check.size=F.
 #' @param savepath The file path to download to. Defaults to NA, in which case the working directory is used.
-#' @param token User specific API token (generated within neon.datascience user accounts)
+#' @param token User specific API token (generated within data.neonscience.org user accounts)
+#' @param progress T or F, should progress bars be printed? Defaults to TRUE.
 
 #' @return A folder in the working directory, containing all files meeting query criteria.
 
@@ -36,7 +37,8 @@
 
 byTileAOP <- function(dpID, site, year, easting, northing, buffer=0,
                       include.provisional=FALSE, check.size=TRUE, 
-                      savepath=NA, token=NA_character_) {
+                      savepath=NA, token=NA_character_,
+                      progress=TRUE) {
 
   # error message if dpID isn't formatted as expected
   if(regexpr("DP[1-4]{1}.[0-9]{5}.00[1-2]{1}",dpID)!=1) {
@@ -73,14 +75,15 @@ byTileAOP <- function(dpID, site, year, easting, northing, buffer=0,
   }
   
   # if token is an empty string, set to NA
-  if(identical(token, "")) {
-    token <- NA_character_
-  }
+  if(identical(token, "")) {token <- NA_character_}
+  
+  # check for token expiration
+  token <- tokenCheck(token)
   
   releases <- character()
 
   # query the products endpoint for the product requested
-  prod.req <- getAPI(apiURL = paste("http://data.neonscience.org/api/v0/products/", dpID, sep=""), 
+  prod.req <- getAPI(apiURL = paste("https://data.neonscience.org/api/v0/products/", dpID, sep=""), 
                   token = token)
   
   avail <- jsonlite::fromJSON(httr::content(prod.req, as='text', encoding='UTF-8'), 
@@ -94,7 +97,7 @@ byTileAOP <- function(dpID, site, year, easting, northing, buffer=0,
   # check that token was used
   if(!is.na(token) & !is.null(prod.req$headers$`x-ratelimit-limit`)) {
     if(prod.req$headers$`x-ratelimit-limit`==200) {
-      cat('API token was not recognized. Public rate limit applied.\n')
+      message('API token was not recognized. Public rate limit applied.')
     }
   }
 
@@ -107,10 +110,10 @@ byTileAOP <- function(dpID, site, year, easting, northing, buffer=0,
   if(site %in% shared_flights$site) {
     flightSite <- shared_flights$flightSite[which(shared_flights$site==site)]
     if(site %in% c('TREE','CHEQ','KONA','DCFS')) {
-      cat(paste(site, ' is part of the flight box for ', flightSite,
+      message(paste(site, ' is part of the flight box for ', flightSite,
                 '. Downloading data from ', flightSite, '.\n', sep=''))
     } else {
-      cat(paste(site, ' is an aquatic site and is sometimes included in the flight box for ', flightSite,
+      message(paste(site, ' is an aquatic site and is sometimes included in the flight box for ', flightSite,
                 '. Aquatic sites are not always included in flight coverage every year.\nDownloading data from ',
                 flightSite, '. Check data to confirm coverage of ', site, '.\n', sep=''))
     }
@@ -154,7 +157,7 @@ byTileAOP <- function(dpID, site, year, easting, northing, buffer=0,
     easting <- c(easting17, df18coords$x)
     northing <- c(northing17, df18coords$y)
 
-    cat('Blandy (BLAN) plots include two UTM zones, flight data are all in 17N.
+    message('Blandy (BLAN) plots include two UTM zones, flight data are all in 17N.
         Coordinates in UTM zone 18N have been converted to 17N to download the correct tiles.
         You will need to make the same conversion to connect airborne to ground data.')
   }
@@ -258,7 +261,9 @@ byTileAOP <- function(dpID, site, year, easting, northing, buffer=0,
       stop("Download halted.")
     }
   } else {
-    cat(paste("Downloading files totaling approximately", downld.size.read, "\n", sep=" "))
+    if(isTRUE(progress)) {
+      message(paste("Downloading files totaling approximately", downld.size.read, "\n", sep=" "))
+    }
     }
 
   # create folder in working directory to put files in
@@ -276,17 +281,18 @@ byTileAOP <- function(dpID, site, year, easting, northing, buffer=0,
   
   # copy zip files into folder
   j <- 1
-  messages <- list()
-  writeLines(paste("Downloading ", nrow(file.urls.current[[1]]), " files", sep=""))
-  pb <- utils::txtProgressBar(style=3)
-  utils::setTxtProgressBar(pb, 1/(nrow(file.urls.current[[1]])-1))
+  if(isTRUE(progress)) {
+    message(paste("Downloading ", nrow(file.urls.current[[1]]), " files", sep=""))
+    pb <- utils::txtProgressBar(style=3)
+    utils::setTxtProgressBar(pb, 1/(nrow(file.urls.current[[1]])-1))
+  }
 
-  counter<- 1
+  counter <- 1
 
   while(j <= nrow(file.urls.current[[1]])) {
 
     if (counter > 2) {
-      cat(paste0("\nRefresh did not solve the isse. URL query for file ", file.urls.current[[1]]$name[j],
+      message(paste0("\nRefresh did not solve the isse. URL query for file ", file.urls.current[[1]]$name[j],
                   " failed. If all files fail, check data portal (data.neonscience.org/news) for possible outage alert.\n",
                  "If file sizes are large, increase the timeout limit on your machine: options(timeout=###)"))
 
@@ -325,7 +331,7 @@ byTileAOP <- function(dpID, site, year, easting, northing, buffer=0,
         
         # re-attempt download once with no changes
         if(counter < 2) {
-          writeLines(paste0("\n", file.urls.current[[1]]$name[j], " could not be downloaded. Re-attempting."))
+          message(paste0("\n", file.urls.current[[1]]$name[j], " could not be downloaded. Re-attempting."))
           t <- tryCatch(
             {
               suppressWarnings(downloader::download(file.urls.current[[1]]$URL[j],
@@ -336,12 +342,12 @@ byTileAOP <- function(dpID, site, year, easting, northing, buffer=0,
           if(inherits(t, "error")) {
             counter <- counter + 1
           } else {
-            messages[j] <- paste(file.urls.current[[1]]$name[j], "downloaded to", newpath, sep=" ")
+            #message(paste(file.urls.current[[1]]$name[j], "downloaded to", newpath, sep=" "))
             j <- j + 1
             counter <- 1
           }
         } else {
-          writeLines(paste0("\n", file.urls.current[[1]]$name[j], " could not be downloaded. URLs may have expired. Refreshing URL list."))
+          message(paste0("\n", file.urls.current[[1]]$name[j], " could not be downloaded. URLs may have expired. Refreshing URL list."))
           file.urls.new <- getTileUrls(month.urls, tileEasting, tileNorthing, 
                                        include.provisional=include.provisional, token=token)
           file.urls.current <- file.urls.new
@@ -349,17 +355,23 @@ byTileAOP <- function(dpID, site, year, easting, northing, buffer=0,
         }
         
       } else {
-        messages[j] <- paste(file.urls.current[[1]]$name[j], "downloaded to", newpath, sep=" ")
+        #message(paste(file.urls.current[[1]]$name[j], "downloaded to", newpath, sep=" "))
         j <- j + 1
         counter <- 1
         releases <- c(releases, file.urls.current[[2]])
-        utils::setTxtProgressBar(pb, j/(nrow(file.urls.current[[1]])-1))
+        
+        if(isTRUE(progress)) {
+          utils::setTxtProgressBar(pb, j/(nrow(file.urls.current[[1]])-1))
+        }
+        
       }
 
     }
   }
-  utils::setTxtProgressBar(pb, 1)
-  close(pb)
+  if(isTRUE(progress)) {
+    utils::setTxtProgressBar(pb, 1)
+    close(pb)
+  }
   
   # get issue log and write to file
   issues <- getIssueLog(dpID=dpID, token=token)
@@ -386,6 +398,9 @@ byTileAOP <- function(dpID, site, year, easting, northing, buffer=0,
     }
   }
 
-  writeLines(paste("Successfully downloaded ", length(messages), " files to ", filepath, sep=""))
-  #writeLines(paste0(messages, collapse = "\n")) # removed in v2.2.0, file lists were excessively long
+  # add a counter instead of using starting number
+  if(isTRUE(progress)) {
+    message(paste("Successfully downloaded ", nrow(file.urls.current[[1]]), " files to ", filepath, sep=""))
+  }
+  
 }

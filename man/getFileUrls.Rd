@@ -11,7 +11,7 @@ getFileUrls(m.urls, include.provisional, token = NA)
 
 \item{include.provisional}{T or F, should provisional data be included in downloaded files?}
 
-\item{token}{User specific API token (generated within neon.datascience user accounts)}
+\item{token}{User specific API token (generated within data.neonscience.org user accounts)}
 }
 \value{
 A dataframe comprised of file names, S3 URLs, file size, and download status (default = 0)
@@ -26,3 +26,4 @@ License: GNU AFFERO GENERAL PUBLIC LICENSE Version 3, 19 November 2007
 Claire Lunch \email{clunch@battelleecology.org}
 Christine Laney \email{claney@battelleecology.org}
 }
+\keyword{internal}

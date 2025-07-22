@@ -15,10 +15,12 @@ zipsByProduct(
   tabl = "all",
   check.size = TRUE,
   include.provisional = FALSE,
+  cloud.mode = FALSE,
   savepath = NA,
-  load = F,
+  load = FALSE,
   token = NA_character_,
-  avg = NA
+  avg = NA,
+  progress = TRUE
 )
 }
 \arguments{
@@ -42,13 +44,17 @@ zipsByProduct(
 
 \item{include.provisional}{T or F, should provisional data be included in downloaded files? Defaults to F. See https://www.neonscience.org/data-samples/data-management/data-revisions-releases for details on the difference between provisional and released data.}
 
+\item{cloud.mode}{T or F, are data transferred from one cloud environment to another? If T, this function returns a list of url paths to data files.}
+
 \item{savepath}{The location to save the output files to}
 
 \item{load}{T or F, are files saved locally or loaded directly? Used silently with loadByProduct(), do not set manually.}
 
-\item{token}{User specific API token (generated within neon.datascience user accounts). Optional.}
+\item{token}{User specific API token (generated within data.neonscience.org user accounts). Optional.}
 
 \item{avg}{Deprecated; use timeIndex}
+
+\item{progress}{T or F, should progress bars be printed? Defaults to TRUE.}
 }
 \value{
 A folder in the working directory (or in savepath, if specified), containing all zip files meeting query criteria.

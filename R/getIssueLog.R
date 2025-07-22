@@ -8,7 +8,7 @@
 #' Use the NEON API to get the issue log in a user-friendly format
 
 #' @param dpID The data product identifier, formatted as DP#.#####.###
-#' @param token User specific API token (generated within neon.datascience user accounts)
+#' @param token User specific API token (generated within data.neonscience.org user accounts)
 
 #' @return A table of issues reported for the data product.
 
@@ -34,7 +34,7 @@ getIssueLog <- function(dpID=NA, token=NA_character_) {
   if(dpID=="DP4.00200.001") {
     issuelog <- getEddyLog(token=token)
   } else {
-    req <- getAPI(apiURL = paste0("http://data.neonscience.org/api/v0/products/", dpID), 
+    req <- getAPI(apiURL = paste0("https://data.neonscience.org/api/v0/products/", dpID), 
                   token = token)
     
     if(is.null(req)) {
