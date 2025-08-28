@@ -70,10 +70,15 @@ datasetQuery <- function(dpID, site="all",
                    "DP4.00067.001","DP4.00137.001","DP4.00201.001","DP1.00030.001")) {
       stop(paste(dpID, " is an eddy covariance data product and can't be queried using this function.", sep=""))
     }
-    if(grepl(pattern="^ais[.]", x=tabl)) {
+    if(grepl(pattern="^ais[_]", x=tabl)) {
       tabl <- tabl
+      if(any(!is.na(c(hor, ver)))) {
+        hor <- NA
+        ver <- NA
+        message("AIS maintenance tables can't be queried by location index; hor and ver will be ignored.")
+      }
     } else {
-      if(site=="all" | length(site)>1) {
+      if(length(site)>1 | identical(site, "all")) {
         stop(paste(dpID, " is a sensor data product and can only be queried at a single site using this function. If you need data at multiple sites, run multiple queries or use loadByProduct().", sep=""))
       }
       if(any(is.na(c(hor, ver)))) {
@@ -82,6 +87,15 @@ datasetQuery <- function(dpID, site="all",
       if(any(nchar(c(hor,ver))!=3)) {
         stop("hor and ver must be 3-digit codes in character format.")
       }
+      if(any(c(length(hor), length(ver))!=1)) {
+        stop("Only a single sensor location can be queried; hor and ver must each be a single code.")
+      }
+    }
+  } else {
+    if(any(!is.na(c(hor, ver)))) {
+      hor <- NA
+      ver <- NA
+      message(paste(dpID, "is an observational data product; hor and ver will be ignored."))
     }
   }
   
@@ -101,11 +115,13 @@ datasetQuery <- function(dpID, site="all",
   # subset by hor and ver
   if(!is.na(ver)) {
     # urls to files only
-    urlset[["files"]] <- base::grep(pattern=paste("[.]", hor, "[.]", ver, "[.]", 
-                                      sep=""), x=urlset[["files"]], value=TRUE)
+    urlset[["files"]] <- base::grep(pattern=paste(
+      "[.]00[0-9]{1}[.]", hor, "[.]", ver, "[.][0-9]{2}[A-Z0-9]{1}[.]", sep=""), 
+      x=urlset[["files"]], value=TRUE)
     # data frame with urls, checksums, variables files, etc
-    hvind <- base::grep(pattern=paste("[.]", hor, "[.]", ver, "[.]", 
-                             sep=""), x=urlset[["filesall"]])
+    hvind <- base::grep(pattern=paste(
+      "[.]00[0-9]{1}[.]", hor, "[.]", ver, "[.][0-9]{2}[A-Z0-9]{1}[.]", sep=""), 
+      x=urlset[["filesall"]]$url)
     urlsub <- urlset[["filesall"]][hvind,]
   } else {
     urlsub <- urlset[["filesall"]]
