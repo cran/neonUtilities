@@ -101,7 +101,7 @@ stackDataFilesArrow <- function(folder, cloud.mode=FALSE, progress=TRUE, dpID){
       # pass to custom stacking function
       if(length(fungifiles)>0) {
         fungilst <- stackFrameFiles(fungifiles, dpID=dpID, 
-                                    seqType=NA_character_, 
+                                    seqType="ITS", 
                                     cloud.mode=cloud.mode)
         
         stacklist[[fungilst[[2]]]] <- fungilst[[1]]
@@ -109,7 +109,7 @@ stackDataFilesArrow <- function(folder, cloud.mode=FALSE, progress=TRUE, dpID){
       
       if(length(bacteriafiles)>0) {
         bacterialst <- stackFrameFiles(bacteriafiles, dpID=dpID, 
-                                       seqType=NA_character_, 
+                                       seqType="16S", 
                                        cloud.mode=cloud.mode)
         
         stacklist[[bacterialst[[2]]]] <- bacterialst[[1]]
@@ -341,9 +341,9 @@ stackDataFilesArrow <- function(folder, cloud.mode=FALSE, progress=TRUE, dpID){
               m5path <- md5var[which(varPubDate==flset$urlPubDate[b])]
               if(length(mpath)==0) {
                 dist <- as.numeric(substring(flset$urlPubDate[b], 10, 15)) - 
-                  as.numeric(substring(flset$varPubDate[b], 10, 15))
-                mpath <- varpaths[which(dist==min(dist))]
-                m5path <- md5var[which(dist==min(dist))]
+                  as.numeric(substring(varPubDate, 10, 15))
+                mpath <- varpaths[which(abs(dist)==min(abs(dist)))]
+                m5path <- md5var[which(abs(dist)==min(abs(dist)))]
               }
               flset$urlvar[b] <- mpath[1]
               flset$md5var[b] <- m5path[1]

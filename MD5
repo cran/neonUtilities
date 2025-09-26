@@ -1,6 +1,6 @@
-e8769517c51d4c4a446c0c2c15267148 *DESCRIPTION
+e0cfae333a984247340b9c7a966a639c *DESCRIPTION
 74c03a403af170494c6fa7b00c9aaf16 *NAMESPACE
-2b245b59d05f8b6c7ed39bb5f51a8c9e *NEWS.md
+be06ae0ef30294a3c105471013e9a4f2 *NEWS.md
 4e29b2ef56ea9d52eca56b1f78599d99 *R/addFilename.R
 9099554b47f8eaf5ba3262bb9737b511 *R/assignClasses.R
 0cb64b6b39dbcdb0a15e20d19de36bcf *R/byEventSIM.R
@@ -10,7 +10,7 @@ c07e7ff0edf1c37551c7cf0ba77594eb *R/byTileAOP.R
 4c22c51910d9b618b6e6b059acb90c28 *R/chem_bundles.R
 614d7a0a35dfe75dbbe3c5f96b11001e *R/cleanUp.R
 f97740db40ba9c0d60821a56a1e1a0fd *R/convByteSize.R
-0aee07e71e9e52b1f4111b00022cdff8 *R/datasetQuery.R
+31aa8ec21b689ae742cd3ed6f7584dd8 *R/datasetQuery.R
 c803b35d43ab37debff4a4fd4f57258c *R/dateConvert.R
 5b09a3228b2e2e03017cee6d12e0067c *R/eddyStampCheck.R
 7652b8d9033bdb1bc63ee40d59a0d30b *R/findDatatables.R
@@ -57,7 +57,7 @@ d5907a0b34d6615d9f2ba94e61c3deeb *R/schemaAllStrings.R
 5381592a83396d81abf235be66e1af26 *R/shared_aquatic.R
 5ffbef293981ef2578081a6f3d33ae9b *R/shared_flights.R
 e4fdd6f03c68f94625e56d54cb0b874f *R/stackByTable.R
-0d1b1b9bf6c7403be6770f986e9e03c0 *R/stackDataFilesArrow.R
+208d64ef5ddbcfb55cdbbdec1281951c *R/stackDataFilesArrow.R
 be9af2d681168a3c068f47d7010a932b *R/stackEddy.R
 bd3cb5f214c41aaaa07a8beaf2950eae *R/stackFrameFiles.R
 2378898654eaf55f498ec9dbf1239183 *R/stackFromStore.R
@@ -70,7 +70,7 @@ c9ca173c909ace9c1c28c99b395a5f76 *R/tokenDate.R
 7bc9509707b803d34a7f990a05c6a408 *R/unzipZipfileParallel.R
 3fc8562653f1736a76c0580cdc91d2fd *R/zipsByProduct.R
 319f416fe4db5b81156794ee584ebd8b *R/zipsByURI.R
-50b168824439aa0399258872078be500 *README.md
+bbc377023099648e4f66603e2bedb146 *README.md
 d2b0ccaf7205d87e178c00d2fe80bd0d *data/chem_bundles.rda
 0167048c46dbd3217e575c8345837151 *data/other_bundles.rda
 90118c1137f4296cb8f05d8dd3e40b79 *data/shared_aquatic.rda
