@@ -141,10 +141,26 @@ zipsByProduct <- function(dpID, site="all", startdate=NA, enddate=NA, package="b
   
   # redirect for met/precip data shared between terrestrial & aquatic sites
   # site=='all' not addressed, because in that case all available sites for the product are returned
+  # special handling for BLWA, due to DELA decommissioning in 2025
+  BLWAflag <- FALSE
   if(length(intersect(which(shared_aquatic$product==dpID), which(shared_aquatic$site %in% site)))>0) {
+    if("BLWA" %in% site) {
+      if(release %in% c("RELEASE-2021","RELEASE-2022","RELEASE-2023","RELEASE-2024","RELEASE-2025")) {
+        shared_aquatic <- shared_aquatic
+      } else {
+        if(!"DELA" %in% site) {
+          shared_aquatic <- shared_aquatic[which(shared_aquatic$site != "BLWA"),]
+          site <- c(site, "DELA")
+          BLWAflag <- TRUE
+        }
+      }
+    }
     message(paste("Some sites in your download request are aquatic sites where ", 
-              dpID, " is collected at a nearby terrestrial site. The sites you requested, and the sites that will be accessed instead, are listed below:\n", 
-              sep=""))
+                  dpID, " is collected at a nearby terrestrial site. The sites you requested, and the sites that will be accessed instead, are listed below:\n", 
+                  sep=""))
+    if(isTRUE(BLWAflag)) {
+      message("Until the fall of 2025, meteorological data for BLWA were collected at DELA. Data collection at DELA ended in late 2025 and the meteorological station was relocated to BLWA. If your download request crosses this time period, data will be downloaded from each site for the time period when they are available.\n")
+    }
     site <- unlist(lapply(site, function(x) {
       if(x %in% shared_aquatic$site) {
         if(dpID %in% shared_aquatic$product[which(shared_aquatic$site==x)]) {
@@ -274,12 +290,6 @@ zipsByProduct <- function(dpID, site="all", startdate=NA, enddate=NA, package="b
           message(paste("Downloading by time interval is not available for ", dpID,
                         ". Proceeding to download all available data.\n", sep=""))
           avg <- "all"
-        } else {
-          # check and make sure the averaging interval is valid for the product
-          if(!avg %in% table_types$tableTMI[which(table_types$productID==dpID)]) {
-            stop(paste(avg, " is not a valid time interval for ", dpID,
-                       ". Use function getTimeIndex() to find valid time intervals.", sep=""))
-          }
         }
       }
     }
