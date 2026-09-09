@@ -400,86 +400,57 @@ zipsByProduct <- function(dpID, site="all", startdate=NA, enddate=NA, package="b
       utils::setTxtProgressBar(pb, 1/(nrow(zip.urls)-1))
     }
     
-    j <- 1
-    counter <- 1
-    
-    while(j <= nrow(zip.urls)) {
+    for(j in 1:nrow(zip.urls)) {
       
-      if (counter > 2) {
-        message(paste0("\nRefresh did not solve the issue. URL query for file ", zip.urls$name[j],
-                       " failed. If all files fail, check data portal (data.neonscience.org/news) for possible outage alert.\n",
-                       "If file sizes are large, increase the timeout limit on your machine: options(timeout=###)"))
-        j <- j + 1
-        counter <- 1
-      } else {
-        zip_out <- paste(filepath, zip.urls$name[j], sep="/")
-        if(!dir.exists(dirname(zip_out))) {
-          dir.create(dirname(zip_out))
-        }
-        if(!file.exists(substr(zip_out, 1, nchar(zip_out)-4)) || !file.exists(zip_out)) {
-          if(is.na(token)) {
-            t <- tryCatch(
-              {
-                suppressWarnings(downloader::download(zip.urls$URL[j], destfile=zip_out,
-                                                      mode="wb", quiet=T,
-                                                      headers=c("User-Agent"=usera)))
-              }, error = function(e) { e } )
-          } else {
-            t <- tryCatch(
-              {
-                suppressWarnings(downloader::download(zip.urls$URL[j], destfile=zip_out,
-                                                      mode="wb", quiet=T,
-                                                      headers=c("User-Agent"=usera,
-                                                                "X-API-Token"=token)))
-              }, error = function(e) { e } )
-          }
+      zip_out <- paste(filepath, zip.urls$name[j], sep="/")
+      if(!dir.exists(dirname(zip_out))) {
+        dir.create(dirname(zip_out))
+      }
+      if(!file.exists(substr(zip_out, 1, nchar(zip_out)-4)) || !file.exists(zip_out)) {
+        
+        dt <- downloadNEONFile(url=zip.urls$URL[j],
+                               outpath=zip_out,
+                               useragent=usera,
+                               token=token)
+        
+        if(inherits(dt, "error")) {
           
-          if(inherits(t, "error")) {
+          # get header to check for rate limit, then re-attempt download once with no other changes
+          testget <- getAPIHeaders(zip.urls$URL[j], token=token)
+          
+          dt2 <- downloadNEONFile(url=zip.urls$URL[j],
+                                  outpath=zip_out,
+                                  useragent=usera,
+                                  token=token)
+          
+          if(inherits(dt2, "error")) {
+            # check expiration date
+            urlexp <- checkUrlExp(zip.urls$URL[j])
             
-            # use getAPI() to check for rate limit, then re-attempt download once with no other changes
-            if(counter < 2) {
-              message(paste0("\n", zip.urls$name[j], " could not be downloaded. Re-attempting."))
-              testget <- getAPI(zip.urls$URL[j], token=token)
-              
-              if(is.na(token)) {
-                t <- tryCatch(
-                  {
-                    suppressWarnings(downloader::download(zip.urls$URL[j], destfile=zip_out,
-                                                          mode="wb", quiet=T,
-                                                          headers=c("User-Agent"=usera)))
-                  }, error = function(e) { e } )
-              } else {
-                t <- tryCatch(
-                  {
-                    suppressWarnings(downloader::download(zip.urls$URL[j], destfile=zip_out,
-                                                          mode="wb", quiet=T,
-                                                          headers=c("User-Agent"=usera,
-                                                                    "X-API-Token"=token)))
-                  }, error = function(e) { e } )
-              }
-              
-              if(inherits(t, "error")) {
-                counter <- counter + 1
-              } else {
-                j <- j + 1
-                counter <- 1
-              }
+            if(is.null(urlexp)) {
+              message(paste0("\nDownload of file ", zip.urls$name[j],
+                             " failed. If all files fail, check data portal (neonscience.org/data) for possible outage alert.\n",
+                             "The most common cause of download failures is timeout. If file sizes are large, increase the timeout limit on your machine: options(timeout=###)"))
+              unlink(zip_out)
             } else {
-              message(paste0("\n", zip.urls$name[j], " could not be downloaded. URLs may have expired. Refreshing URL list."))
-              
-              zip.urls <- quietMessages(getZipUrls(month.urls, avg=avg, package=package, tabl=tabl, 
-                                                   include.provisional=include.provisional,
-                                                   dpID=dpID, release=release, token=token))
-              zip.urls <- tidyr::drop_na(zip.urls)
-              
-              counter <- counter + 1
+              if(urlexp < Sys.time()) {
+                message(paste0("\nURL for file ", zip.urls$name[j], " has expired. Re-generate url list by re-running the function you used to find data files: loadByProduct(), zipsByProduct(), or queryFiles()."))
+              } else {
+                message(paste0("\nDownload of file ", zip.urls$name[j],
+                               " failed. If all files fail, check data portal (neonscience.org/data) for possible outage alert.\n",
+                               "The most common cause of download failures is timeout. If file sizes are large, increase the timeout limit on your machine: options(timeout=###)"))
+                unlink(zip_out)
+              }
             }
+            
           } else {
-            j <- j + 1
-            counter <- 1
             if(isTRUE(progress)) {
               utils::setTxtProgressBar(pb, j/(nrow(zip.urls)-1))
             }
+          }
+        } else {
+          if(isTRUE(progress)) {
+            utils::setTxtProgressBar(pb, j/(nrow(zip.urls)-1))
           }
         }
         
