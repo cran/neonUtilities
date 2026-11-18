@@ -25,125 +25,185 @@ stackFrameFiles <- function(framefiles, dpID,
                             seqType=NA_character_, 
                             cloud.mode=FALSE) {
   
-  frame_file_variables <- utils::read.csv("https://raw.githubusercontent.com/NEONScience/NEON-utilities/refs/heads/main/helper_files/frame_file_variables.csv")
+  frame_file_variables <- try(utils::read.csv("https://raw.githubusercontent.com/NEONScience/NEON-utilities/refs/heads/main/helper_files/frame_file_variables.csv"),
+                              silent=TRUE)
+  frame_defs <- try(utils::read.csv("https://raw.githubusercontent.com/NEONScience/NEON-utilities/refs/heads/main/helper_files/frame_file_codes.csv"),
+                    silent=TRUE)
+  frame_names <- try(utils::read.csv("https://raw.githubusercontent.com/NEONScience/NEON-utilities/refs/heads/main/helper_files/frame_names.csv"),
+                     silent=TRUE)
+  if(inherits(frame_defs, "try-error")) {
+    message("Internet connection error. Some metadata may rely on cached versions.")
+    frame_defs <- frame_file_codes
+    frame_file_variables <- frame_file_variables_internal
+    frame_names <- frame_names_internal
+  }
+  
+  trystring <- FALSE
   
   # get custom variables file for relevant dpID
   # if dpID isn't on the list, infer schema
-  if(!dpID %in% frame_file_codes$dpID) {
+  if(!dpID %in% frame_defs$dpID) {
     noschema <- TRUE
   } else {
-    module <- frame_file_codes$code[which(frame_file_codes$dpID==dpID)]
+    module <- frame_defs$code[which(frame_defs$dpID==dpID)]
     vartab <- frame_file_variables[which(frame_file_variables$table==module),]
     noschema <- FALSE
   }
+  if(length(vartab)==0) {
+    noschema <- TRUE
+  }
   
   # assign table name
-  tabnm <- "per_sample"
-  if(dpID=="DP1.20190.001") {
-    tabnm <- "rea_conductivityRawData"
-  }
-  if(dpID=="DP1.20193.001") {
-    tabnm <- "sbd_conductivityRawData"
-  }
-  if(dpID=="DP4.00132.001") {
-    tabnm <- "bat_processedSonarFile"
-  }
-  if(dpID=="DP1.30012.001") {
-    tabnm <- "fsp_rawSpectra"
-  }
-  if(dpID=="DP1.10081.001") {
-    tabnm <- paste("mcc_soilPerSampleTaxonomy_", seqType, sep="")
-  }
-  if(dpID=="DP1.20086.001") {
-    tabnm <- paste("mcc_benthicPerSampleTaxonomy_", seqType, sep="")
-  }
-  if(dpID=="DP1.20141.001") {
-    tabnm <- paste("mcc_surfaceWaterPerSampleTaxonomy_", seqType, sep="")
-  }
-  if(dpID=="DP1.10081.002") {
-    tabnm <- paste("mct_soilPerSampleTaxonomy_", seqType, sep="")
-  }
-  if(dpID=="DP1.20086.002") {
-    tabnm <- paste("mct_benthicPerSampleTaxonomy_", seqType, sep="")
-  }
-  if(dpID=="DP1.20141.002") {
-    tabnm <- paste("mct_surfaceWaterPerSampleTaxonomy_", seqType, sep="")
+  if(dpID %in% frame_names$dpID) {
+    tabnm <- frame_names$tableName[which(frame_names$dpID==dpID)]
+  } else {
+    tabnm <- "per_sample"
   }
   
+  # add sequence type suffix if needed
+  if(grepl(pattern="[_]$", tabnm)) {
+    tabnm <- paste(tabnm, seqType, sep="")
+  }
   
-  if(isFALSE(noschema)) {
+  # start with local mode
+  if(isFALSE(cloud.mode)) {
     
-    # get schema from custom variables file and read dataset
-    frameschema <- schemaFromVar(vartab, tab=module, package="expanded")
-    fdat <- arrow::open_csv_dataset(sources=framefiles,
-                                    schema=frameschema, skip=1)
-    fdattab <- try(data.frame(dplyr::collect(fdat)), silent=TRUE)
-    
-    # if stacking fails, check for alternate variables file, then redirect to infer the schema
-    if(inherits(fdattab, "try-error")) {
-      if(paste(module, "2", sep="") %in% frame_file_variables$table) {
-        vartab2 <- frame_file_variables[which(frame_file_variables$table==paste(module, "2", sep="")),]
-        frameschema <- schemaFromVar(vartab2, tab=paste(module, "2", sep=""), package="expanded")
-        fdat <- arrow::open_csv_dataset(sources=framefiles, 
-                                        schema=frameschema, skip=1)
-        fdattab <- try(data.frame(dplyr::collect(fdat)), silent=TRUE)
-      }
+    if(isFALSE(noschema)) {
+      
+      # get schema from custom variables file and read dataset
+      frameschema <- schemaFromVar(vartab, tab=module, package="expanded")
+      fdat <- arrow::open_csv_dataset(sources=framefiles,
+                                      schema=frameschema, skip=1)
+      fdattab <- try(data.frame(dplyr::collect(fdat)), silent=TRUE)
+      
+      # if stacking fails, check for alternate variables file, then redirect to infer the schema
       if(inherits(fdattab, "try-error")) {
+        if(paste(module, "2", sep="") %in% frame_file_variables$table) {
+          vartab2 <- frame_file_variables[which(frame_file_variables$table==paste(module, "2", sep="")),]
+          frameschema <- schemaFromVar(vartab2, tab=paste(module, "2", sep=""), package="expanded")
+          fdat <- arrow::open_csv_dataset(sources=framefiles, 
+                                          schema=frameschema, skip=1)
+          fdattab <- try(data.frame(dplyr::collect(fdat)), silent=TRUE)
+        }
+        if(inherits(fdattab, "try-error")) {
+          noschema <- TRUE
+        }
+      }
+    }
+    
+    if(isTRUE(noschema)) {
+      
+      message(paste("Variables file was not found or was inconsistent for table ", tabnm, ". Schema will be inferred; performance may be reduced.", sep=""))
+      fsdat <- try(arrow::open_csv_dataset(sources=framefiles, col_names=TRUE, 
+                                           unify_schemas=TRUE, skip=0), silent=TRUE)
+      if(inherits(fsdat, "try-error")) {
+        # if unifying schemas fails, make a string schema from the superset of field names
+        message("Inferring schema failed. All fields will be read as strings. This can be slow, and can usually be avoided by excluding provisional data.")
+        stringschema <- schemaAllStringsFromSet(framefiles)
+        fsdat <- try(arrow::open_csv_dataset(sources=framefiles, 
+                                             schema=stringschema,
+                                             skip=1), silent=TRUE)
+      }
+      fdattab <- try(data.frame(dplyr::collect(fsdat)), silent=TRUE)
+      if(inherits(fdattab, "try-error")) {
+        # try string schema for each file and unify
+        stringtablist <- list()
+        stringpiecewise <- TRUE
+        for(p in 1:length(framefiles)) {
+          
+          stringschema <- schemaAllStringsFromSet(framefiles[p])
+          
+          ds <- try(arrow::open_csv_dataset(sources=framefiles[p], 
+                                            schema=stringschema,
+                                            skip=1), silent=TRUE)
+          if(inherits(ds, "try-error")) {
+            stringpiecewise <- FALSE
+            next
+          } else {
+            stringtablist[[p]] <- ds
+          }
+          
+        }
+        
+        if(isFALSE(stringpiecewise)) {
+          message(paste("Reading data as strings failed for table ", tabnm, ". Try excluding provisional data, and contact NEON if unable to resolve.", sep=""))
+          return(invisible())
+        } else {
+          # if all chunks succeeded, merge them
+          ds <- try(arrow::open_csv_dataset(sources=stringtablist, 
+                                            unify_schemas=TRUE,
+                                            skip=0), silent=TRUE)
+          
+          fdattab <- try(data.frame(dplyr::collect(ds)), silent=TRUE)
+          
+          if(inherits(fdattab, "try-error")) {
+            message(paste("Reading data as strings failed for table ", tabnm, ". Try excluding provisional data, and contact NEON if unable to resolve.", sep=""))
+            return(invisible())
+          }
+        }
+      }
+    }
+    
+  # cloud mode
+  } else {
+    
+    if(isFALSE(noschema)) {
+      
+      # use variables file if available
+      frameschema <- schemaFromVarDuck(vartab,
+                                       tab=module,
+                                       package="expanded")
+      ds <- try(duckdbfs::open_dataset(sources=framefiles, 
+                                       filename=TRUE,
+                                       parser_options = c(
+                                         columns=frameschema[[1]],
+                                         header=TRUE,
+                                         timestampformat=frameschema[[2]]
+                                       ),
+                                       format="csv"), silent=TRUE)
+      if(inherits(ds, "try-error")) {
         noschema <- TRUE
       }
     }
-  }
-  
-  if(isTRUE(noschema)) {
     
-    message(paste("Variables file was not found or was inconsistent for table ", tabnm, ". Schema will be inferred; performance may be reduced.", sep=""))
-    fsdat <- try(arrow::open_csv_dataset(sources=framefiles, col_names=TRUE, 
-                                     unify_schemas=TRUE, skip=0), silent=TRUE)
-    if(inherits(fsdat, "try-error")) {
-      # if unifying schemas fails, make a string schema from the superset of field names
-      message("Inferring schema failed. All fields will be read as strings. This can be slow, and can usually be avoided by excluding provisional data.")
-      stringschema <- schemaAllStringsFromSet(framefiles)
-      fsdat <- try(arrow::open_csv_dataset(sources=framefiles, 
-                                           schema=stringschema,
-                                           skip=1), silent=TRUE)
+    # try to infer if no variables file
+    if(isTRUE(noschema)) {
+      message(paste("Variables file was not found or failed for table", tabnm, 
+                    ". Data types will be inferred.", sep=""))
+      ds <- try(duckdbfs::open_dataset(sources=framefiles, 
+                                       unify_schemas=TRUE,
+                                       filename=TRUE,
+                                       format="csv"), silent=TRUE)
+      if(inherits(ds, "try-error")) {
+        trystring <- TRUE
+      }
     }
-    fdattab <- try(data.frame(dplyr::collect(fsdat)), silent=TRUE)
-    if(inherits(fdattab, "try-error")) {
-      # try string schema for each file and unify
-      stringtablist <- list()
-      stringpiecewise <- TRUE
-      for(p in 1:length(framefiles)) {
-        
-        stringschema <- schemaAllStringsFromSet(framefiles[p])
-        
-        ds <- try(arrow::open_csv_dataset(sources=framefiles[p], 
-                                          schema=stringschema,
-                                          skip=1), silent=TRUE)
-        if(inherits(ds, "try-error")) {
-          stringpiecewise <- FALSE
-          next
-        } else {
-          stringtablist[[p]] <- ds
-        }
-        
-      }
-      
-      if(isFALSE(stringpiecewise)) {
-        message(paste("Reading data as strings failed for table ", tabnm, ". Try excluding provisional data, and contact NEON if unable to resolve.", sep=""))
+    
+    # string schema if above fails
+    if(isTRUE(trystring)) {
+      message(paste("Data retrieval using inference to generate schema failed for table", tabnm, 
+                    ". All fields will be read as strings. This can usually be avoided by excluding provisional data.",
+                    sep=""))
+      ds <- try(duckdbfs::open_dataset(sources=framefiles, 
+                                       unify_schemas=TRUE,
+                                       filename=TRUE,
+                                       parser_options = c(
+                                         all_varchar=TRUE,
+                                         header=TRUE
+                                       ),
+                                       format="csv"), silent=TRUE)
+      if(inherits(ds, "try-error")) {
+        message(paste("Reading data as strings failed for table ", tabnm, 
+                      ". Try excluding provisional data, and contact NEON if unable to resolve.", sep=""))
         return(invisible())
-      } else {
-        # if all chunks succeeded, merge them
-        ds <- try(arrow::open_csv_dataset(sources=stringtablist, 
-                                          unify_schemas=TRUE,
-                                          skip=0), silent=TRUE)
-        
-        fdattab <- try(data.frame(dplyr::collect(ds)), silent=TRUE)
-        
-        if(inherits(fdattab, "try-error")) {
-          message(paste("Reading data as strings failed for table ", tabnm, ". Try excluding provisional data, and contact NEON if unable to resolve.", sep=""))
-          return(invisible())
-        }
       }
+    }
+    
+    fdattab <- try(data.frame(dplyr::collect(ds)), silent=TRUE)
+    if(inherits(fdattab, "try-error")) {
+      message(paste("Data stacking failed for table ", tabnm, 
+                    ". Try excluding provisional data, and contact NEON if unable to resolve.", sep=""))
+      return(invisible())
     }
   }
   

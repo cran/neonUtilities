@@ -73,11 +73,16 @@ stackDataFilesArrow <- function(folder, cloud.mode=FALSE,
   # start list of tables
   stacklist <- list()
   
+  # get list of data frame products
+  frame_defs <- try(utils::read.csv("https://raw.githubusercontent.com/NEONScience/NEON-utilities/refs/heads/main/helper_files/frame_file_codes.csv"),
+                     silent=TRUE)
+  if(inherits(frame_defs, "try-error")) {
+    message("Internet connection error. Some metadata may rely on cached versions.")
+    frame_defs <- frame_file_codes
+  }
+  
   # handle per-sample (data frame) tables separately
-  if(dpID %in% c("DP1.30012.001", "DP1.10081.001", "DP1.20086.001", 
-                 "DP1.20141.001", "DP1.20190.001", "DP1.20193.001",
-                 "DP1.10081.002", "DP1.20086.002", "DP1.20141.002",
-                 "DP4.00132.001") & 
+  if(dpID %in% frame_defs$dpID & 
      length(grep("^NEON.", basename(filenames), invert=TRUE))>0) {
     framefiles <- filepaths[grep("^NEON.", basename(filenames), invert=TRUE)]
     filepaths <- filepaths[grep("^NEON.", basename(filenames))]
@@ -86,9 +91,11 @@ stackDataFilesArrow <- function(folder, cloud.mode=FALSE,
     # stack frame files
     message("Stacking per-sample files. These files may be very large; download data in smaller subsets if performance problems are encountered.")
 
+    # is this a frame file with both bacteria and fungi files?
+    bacfungdps <- frame_defs$dpID[which(frame_defs$bacfung==1)]
+    
     # stacking for everything except community taxonomy
-    if(!dpID %in% c("DP1.10081.001", "DP1.20086.001", "DP1.20141.001", 
-                    "DP1.10081.002", "DP1.20086.002", "DP1.20141.002")) {
+    if(!dpID %in% bacfungdps) {
       
       # pass to custom stacking function
       frmlst <- stackFrameFiles(framefiles, dpID=dpID, 
@@ -240,7 +247,10 @@ stackDataFilesArrow <- function(folder, cloud.mode=FALSE,
       tbltype <- unique(ttypes$tableType[which(ttypes$tableName == gsub(tables[i], pattern = "_pub", replacement = ""))])
       
       # create arrow schema from variables file
-      tableschema <- schemaFromVar(variables=v, tab=tables[i], package=package)
+      tableschema <- try(schemaFromVar(variables=v, tab=tables[i], package=package), silent = TRUE)
+      if(inherits(tableschema, "try-error")) {
+        tableschema <- NULL
+      }
 
       file_list <- sort(union(filepaths[grep(paste(".", tables[i], "_pub.", sep=""), filepaths, fixed=T)],
                               filepaths[grep(paste(".", tables[i], ".", sep=""), filepaths, fixed=T)]))
@@ -289,7 +299,7 @@ stackDataFilesArrow <- function(folder, cloud.mode=FALSE,
                                  all.string=all.string)
         datf <- try(dplyr::rename(.data=dat, file="filename"), silent=TRUE)
       } else {
-        dat <- arrow::open_csv_dataset(sources=tblfls, schema=tableschema, skip=1)
+        dat <- try(arrow::open_csv_dataset(sources=tblfls, schema=tableschema, skip=1), silent=TRUE)
         datf <- try(dplyr::mutate(.data=dat, file=addFilename()), silent=TRUE)
       }
       
@@ -592,8 +602,9 @@ stackDataFilesArrow <- function(folder, cloud.mode=FALSE,
   }
   
   # get issue log
-  if(!curl::has_internet()) {
-    message("No internet connection, issue log file not accessed. Issue log can be found in the readme file.")
+  r <- try(httr::HEAD("https://data.neonscience.org/api/v0/products/"), silent=TRUE)
+  if(isFALSE(inherits(r, "response"))) {
+    message("Internet connection failed, issue log file not accessed. Issue log can be found in the readme file.")
   } else {
     # token not used here, since token is not otherwise used/accessible in this function
     issues <- getIssueLog(dpID=dpID)
